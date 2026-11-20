@@ -14,10 +14,14 @@ bin/cpr review 5201 --model-out model.json   # also write the report model
 
 A PR of [apache/cassandra-sidecar](https://github.com/apache/cassandra-sidecar) or
 [apache/cassandra-analytics](https://github.com/apache/cassandra-analytics) is named `sidecar#397` or
-`analytics#260` (or `apache/cassandra-sidecar#397`, a PR URL, or `397 --project sidecar`). Sibling
-reports are preliminary: the path layout, ticket keys and credit lines are the project's own, but CI,
-static analysis, compatibility checks, code review and builds still follow Cassandra's rules, and the
-published site and `cpr comment` cover apache/cassandra only. Each project keeps its own data under
+`analytics#260` (or `apache/cassandra-sidecar#397`, a PR URL, or `397 --project sidecar`). Their
+reports apply each project's own rules: the Gradle module layout, CASSSIDECAR and CASSANALYTICS keys,
+CI from the PR head's GitHub Actions checks (a first-time contributor's runs waiting for approval read
+"awaiting approval", not failed), checkstyle with the project's own config and version (sidecar 7.8.1,
+analytics 9.3), and the project's compatibility surfaces. Checks that are not part of their process
+(yaml pairing, nodetool, the upgrade-test CI profile, the lab plan, ...) read not-applicable. Code review
+lenses and builds are not set up for them yet, and the published site and `cpr comment` cover
+apache/cassandra only. Each project keeps its own data under
 `.work/pr/<project>/`, `.work/build-runs/<project>/` and `reports/<project>/`; data from before projects
 existed is moved there on the first run.
 

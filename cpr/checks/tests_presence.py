@@ -26,8 +26,6 @@ def present(bundle, ctx):
     rows += [ev(f"{suite}: {len(fs)} file(s)", location=fs[0]) for suite, fs in sorted(suites.items())]
     if not suites:
         return Result("fail", "Production code changed with no test changes", rows,
-                      action="Add a test that fails without this change: a unit test under test/unit, or an in-JVM "
-                             "dtest under test/distributed for multi-node behaviour. If no test is possible, explain "
-                             "why on the ticket.")
+                      action=ctx.project.commands["test_advice"])
     ratio = test_lines / prod_lines if prod_lines else 0
     return Result("pass", f"Tests changed in {', '.join(sorted(suites))} (test/prod line ratio {ratio:.2f})", rows)

@@ -290,7 +290,7 @@ class Runners(unittest.TestCase):
         self.root = os.path.join(self.d.name, "head")
         for rel in (SSTABLE, "src/java/Other.java"):
             write(self.root, rel, "class X {}\n")
-        self.cfgs = {"checkstyle.xml": "c", "checkstyle_suppressions.xml": "s"}
+        self.cfgs = {".build/checkstyle.xml": "cfg/checkstyle.xml", ".build/checkstyle_suppressions.xml": "cfg/checkstyle_suppressions.xml"}
 
     def tearDown(self):
         self.d.cleanup()
@@ -332,7 +332,7 @@ class Runners(unittest.TestCase):
         with open(props) as f:
             text = f.read()
         self.assertIn("checkstyle.log.dir=" + os.path.join(self.d.name, "head-main-log"), text)
-        self.assertIn("checkstyle.suppressions=s", text)
+        self.assertIn("checkstyle.suppressions=cfg/checkstyle_suppressions.xml", text)
         self.assertIn("-f", seen[0])
 
     def test_pmd_exit_codes(self):

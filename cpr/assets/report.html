@@ -884,6 +884,7 @@ body.no-data #no-data { display: block; }
 
   function extraCi() {
     var out = [];
+    var githubCi = project.ci_provider === "github-checks";  // CI from the head's GitHub check-runs, not JIRA
     var rows = (M.branches || []).map(function (b) {
       var ci = b.ci;
       var ciCells;
@@ -901,7 +902,7 @@ body.no-data #no-data { display: block; }
               h("div", "d-body", list(fails, function (f) { return h("span", "mono", typeof f === "string" ? f : JSON.stringify(f)); }))]) : h("span", "muted", "none") }
         ];
       } else {
-        ciCells = [{ node: chip("fail", "no CI attached") }, "", "", "", "", "", ""];
+        ciCells = [{ node: chip("fail", githubCi ? "no CI run" : "no CI attached") }, "", "", "", "", "", ""];
       }
       return {
         cls: b.is_self ? "self" : null,
@@ -913,6 +914,7 @@ body.no-data #no-data { display: block; }
     });
     out.push(gblock("Target branches", [rows.length ? table(["Branch", "PR", "State", "Head", "CI summary", "CI sha", "Passed", "Failed", "Total", "Upgrade tests", "Failures"], rows)
       : empty("No sibling PRs found for this ticket.", "Backport PRs for the other branches would be listed here once the ticket links them.")], rows.length));
+    if (githubCi) return out;  // the groups below are about summaries attached to JIRA
     var un = M.ci_unmapped || [];
     out.push(gblock("CI summaries not matched to a branch", [un.length ? table(["Summary", "Parse", "Ref", "Problem"], un.map(function (u) {
       return { cells: [{ node: link(u.url, u.attachment || "attachment") }, u.parse_status || "?",
@@ -1024,10 +1026,10 @@ body.no-data #no-data { display: block; }
     }
     var pct = Math.round((pm.threshold || 0.25) * 100);
     var kids = [h("p", "muted", "Violations this PR introduces against PMD's " + pm.rules_run + " Java rules, grouped by how serious the category is. A rule the base branch breaks in at least " +
-      pct + "% of its own files is house style. A rule whose count here is no higher than the base branch's own rate for this many added lines is usual for Cassandra. Both are counted separately below and do not drive the check.")];
+      pct + "% of its own files is house style. A rule whose count here is no higher than the base branch's own rate for this many added lines is usual for " + project.name + ". Both are counted separately below and do not drive the check.")];
     kids.push(h("div", "pm-cats", pm.categories.map(function (c) {
       var d = h("div", "pm-cat s-" + PM_KIND[c.band] + (c.introduced ? "" : " zero"), [h("b", null, String(c.introduced)), h("span", null, c.label)]);
-      d.title = PM_BAND_WORD[c.band] + (c.house ? "; " + c.house + " more in house-style rules" : "") + (c.usual ? "; " + c.usual + " more in rules usual for Cassandra" : "");
+      d.title = PM_BAND_WORD[c.band] + (c.house ? "; " + c.house + " more in house-style rules" : "") + (c.usual ? "; " + c.usual + " more in rules usual for " + project.name : "");
       return d;
     })));
     var b = pm.baseline || {};
@@ -1035,7 +1037,7 @@ body.no-data #no-data { display: block; }
       "House style is judged from all " + (b.files || 0).toLocaleString("en-US") + " source files on " + (b.branch || "the base branch") + " (" + short(b.tip, 10) + (b.source === "reused" ? ", reused from an earlier tip" : "") + ").";
     var rate = pm.rate || {};
     var rateNote = rate.available ? "The usual rate is that branch's " + (rate.loc || 0).toLocaleString("en-US") + " lines against this PR's " + (rate.added_loc || 0).toLocaleString("en-US") + " added production lines." :
-      "No usual-for-Cassandra rate: the branch baseline has no line count.";
+      "No usual-for-" + project.name + " rate: the branch baseline has no line count.";
     kids.push(h("p", "pm-base", [base + " ", b.note ? b.note + " " : "", rateNote + " ",
       pm.type_info ? "Type info was used." : "Without type info: " + String(pm.type_note || "").replace(/^.*without type info: /, "") +
         (pm.untyped_rules ? " " + plural(pm.untyped_rules, "rule") + " that need compiled classes are greyed and not counted." : "")]));
@@ -1071,7 +1073,7 @@ body.no-data #no-data { display: block; }
           { node: String(r.production), num: true }, { node: String(r.expected), num: true },
           { node: r.url ? link(r.url, "PMD docs") : "" }] };
       });
-      kids.push(h("div", "pm-usual", details("Usual for Cassandra: " + plural(pm.usual.length, "rule") + ", " + pm.introduced_usual + " violations",
+      kids.push(h("div", "pm-usual", details("Usual for " + project.name + ": " + plural(pm.usual.length, "rule") + ", " + pm.introduced_usual + " violations",
         [h("p", "muted", "In production code, each rule's count is no higher than the base branch's own rate predicts for this PR's added lines (one-sided Poisson test, p of at least " + (pm.usual_p || 0.01) + "). A rule the branch never breaks is never listed here."),
           table(["Rule", "Category", "Observed", "Expected", "Docs"], urows, { cls: "pm-table" })])));
     }

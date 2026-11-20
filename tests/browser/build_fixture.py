@@ -144,6 +144,16 @@ def bundle_model(name):
     return model_mod.build(b, checks_mod.run_all(b), triage(b), render.load_docs(), diffview.unavailable("not built here"))
 
 
+def sidecar_model():
+    """A Cassandra Sidecar report: Gradle modules, CI from the recorded GitHub checks of sidecar #400."""
+    from cpr import checks as checks_mod, diffview, project
+    from cpr.triage import triage
+    from tests.helpers import sidecar_bundle
+    b = sidecar_bundle()
+    return model_mod.build(b, checks_mod.run_all(b), triage(b), render.load_docs(project=project.of(b)),
+                           diffview.unavailable("not built here"))
+
+
 def build_site(out_dir, model):
     """An index over five different reports: contributor, draft, reviewers (siblings), unknown and ready-ish mixes."""
     from cpr import site
@@ -178,6 +188,7 @@ def main(out_dir):
     render.write(unreviewed(model), os.path.join(out_dir, "unreviewed.html"))
     huge = bundle_model("4967-huge.json.gz")
     render.write(huge, os.path.join(out_dir, "huge.html"))
+    render.write(sidecar_model(), os.path.join(out_dir, "sidecar.html"))
     index, rows = build_site(out_dir, model)
     print(json.dumps({"build": os.path.join(out_dir, "build.html"), "build_none": os.path.join(out_dir, "build-none.html"),
                       "report": os.path.join(out_dir, "report.html"), "hostile": os.path.join(out_dir, "hostile.html"),
@@ -185,7 +196,8 @@ def main(out_dir):
                       "labplan_none": os.path.join(out_dir, "labplan-none.html"),
                       "pmd_rules": os.path.join(out_dir, "pmd-rules.html"),
                       "about": os.path.join(out_dir, "about.html"), "unreviewed": os.path.join(out_dir, "unreviewed.html"),
-                      "huge": os.path.join(out_dir, "huge.html"), "index": index,
+                      "huge": os.path.join(out_dir, "huge.html"), "sidecar": os.path.join(out_dir, "sidecar.html"),
+                      "index": index,
                       "index_groups": {r["group"]: sum(1 for x in rows if x["group"] == r["group"]) for r in rows},
                       "hostile_title": HOSTILE_TITLE, "hostile_evidence": HOSTILE_EVIDENCE}))
 

@@ -53,7 +53,7 @@ def build_report(bundle, work_dir, offline=False, review=None, log=print):
         os.makedirs(os.path.dirname(dv_cache), exist_ok=True)
         with open(dv_cache, "w") as f:
             json.dump(dv, f)
-    docs = render.load_docs()
+    docs = render.load_docs(project=project_mod.of(bundle))
     return model_mod.build(bundle, results, tri, docs, dv, review=review, context=context_mod.build(bundle))
 
 
@@ -286,6 +286,9 @@ def cmd_build(args):
               file=sys.stderr)
         return 1
     decision = gate.decide(bundle, work_dir, approve=args.approve)
+    if proj.data.get("build_tool") != "ant":
+        decision = {**decision, "allowed": False,
+                    "reason": f"cpr build supports apache/cassandra's Ant build only; {proj.name} PRs are not built yet"}
     if not decision["allowed"]:
         path, st = runner.not_built(bundle, work_dir, decision)
     else:

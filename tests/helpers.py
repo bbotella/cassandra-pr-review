@@ -112,6 +112,21 @@ def bundle(**kw):
     return copy.deepcopy(b)
 
 
+def github_ci(fixture, head):
+    """The bundle's `ci.github` from recorded check-runs and workflow runs (tests/fixtures/ci/gh-*-<fixture>.json)."""
+    import json
+    import os
+    from unittest import mock
+    from cpr.ingest import gh_checks
+    d = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures", "ci")
+    pages = {kind: [json.load(open(os.path.join(d, f"gh-{kind}-{fixture}.json")))] for kind in ("check-runs", "workflow-runs")}
+    for w in pages["workflow-runs"][0]["workflow_runs"]:
+        w["head_sha"] = head  # recorded for the real head; the synthetic bundle has its own
+    with mock.patch.object(gh_checks, "gh_json",
+                           side_effect=lambda path, **k: pages["check-runs" if "/check-runs" in path else "workflow-runs"]):
+        return gh_checks.fetch("apache/cassandra-sidecar", head, None)
+
+
 def sidecar_bundle(**kw):
     """A sidecar PR: Gradle modules, CASSSIDECAR key, trunk only, credit line with a markdown-link key."""
     files = [("server/src/main/java/org/apache/cassandra/sidecar/routes/FooHandler.java", ["int x = 1;"], False),
@@ -131,6 +146,9 @@ def sidecar_bundle(**kw):
                                           "fix_versions": ["0.5.0"], "components": []}}
     b["siblings"] = [{**b["siblings"][0], "number": 397, "url": b["pr"]["url"], "base": "trunk"}]
     b["release_branches"] = ["trunk"]
+    b["ci"] = {"status": "ok", "provider": "github-checks", "github": github_ci("sidecar-400", SHA),
+               "summaries": [], "result_archives": []}
+    b["base_files"] = {**b["base_files"], "checkstyle_xml": None}
     for k, v in kw.items():
         b[k] = {**b[k], **v} if isinstance(v, dict) and isinstance(b.get(k), dict) else v
     return copy.deepcopy(b)

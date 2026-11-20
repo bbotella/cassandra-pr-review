@@ -10,11 +10,10 @@ import re
 import time
 
 from cpr import VERSION, layout, project as project_mod, staticanalysis
-from cpr.ingest import ci_summary, clone, github, history as history_mod, jira, keys, roster
+from cpr.ingest import ci_summary, clone, gh_checks, github, history as history_mod, jira, keys, roster
 from cpr.net import NetError, Recorder, http_get
 
 BUNDLE_SCHEMA = 1
-_CHECKSTYLE = ".build/checkstyle.xml"
 
 
 class IngestError(Exception):
@@ -145,11 +144,16 @@ def ingest(project, number, work_dir, log=print):
                      "state": pr["state"], "merged": pr["merged"], "draft": pr["draft"],
                      "head_sha": pr["head_sha"], "is_self": True}]
 
-    ci = {"status": "skipped" if not key_info["key"] else ("unavailable" if jira_info["status"] == "unavailable" else "ok"),
-          "summaries": [], "result_archives": []}
-    if ticket:
-        log("reading CI summaries")
-        ci = collect_ci(ticket, siblings, raw)
+    if project.ci_provider == "github-checks":
+        log("reading GitHub checks of the head")
+        gh = gh_checks.fetch(repo, pr["head_sha"], raw)
+        ci = {"status": gh["status"], "provider": "github-checks", "github": gh, "summaries": [], "result_archives": []}
+    else:
+        ci = {"status": "skipped" if not key_info["key"] else ("unavailable" if jira_info["status"] == "unavailable" else "ok"),
+              "summaries": [], "result_archives": []}
+        if ticket:
+            log("reading CI summaries")
+            ci = collect_ci(ticket, siblings, raw)
 
     log("updating local clone")
     clone_path = layout.clone_dir(work_dir, project)
@@ -158,7 +162,7 @@ def ingest(project, number, work_dir, log=print):
     mb = clone.merge_base(clone_path, number, pr["base"])
     files = clone.changed_files(clone_path, mb, number)
     diff_text = clone.diff(clone_path, mb, number)
-    checkstyle_xml = clone.show(clone_path, clone.base_ref(pr["base"]), _CHECKSTYLE)
+    checkstyle_xml = clone.show(clone_path, clone.base_ref(pr["base"]), project.static["checkstyle"]["configs"]["main"])
     changes_head = clone.show(clone_path, clone.base_ref(pr["base"]), "CHANGES.txt")
 
     log("reading history of the changed code")

@@ -562,3 +562,16 @@ test("PMD rules block says so when the catalog did not run", async ({ page }) =>
   const blk = page.locator("#sec-static .blk", { has: page.locator("h3", { hasText: "PMD rules" }) });
   await expect(blk.locator(".empty")).toContainText("did not run");
 });
+
+test("a Sidecar report names its project and shows CI from the GitHub checks", async ({ page }) => {
+  await page.goto(fileUrl(fixtures().sidecar));
+  await expect(page).toHaveTitle(/— Cassandra Sidecar PR review$/);
+  await expect(page.locator("#nav-eyebrow")).toHaveText("Cassandra Sidecar PR review");
+  await head(page, "ci").click();
+  const ci = group(page, "ci");
+  await expect(ci.locator("tr.self")).toContainText("GitHub Actions (21 checks)");
+  await expect(ci).not.toContainText("CI summaries not matched to a branch");
+  await expect(ci).not.toContainText("Result archives");
+  await head(page, "testing").click();
+  await expect(group(page, "testing")).toContainText("Unit (src/test)");
+});

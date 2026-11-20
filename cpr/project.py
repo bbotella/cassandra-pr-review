@@ -28,6 +28,44 @@ class Project:
         self.jira_keys = tuple(data["jira_keys"])
         self.key_digits = data.get("key_digits", 1)
         self.bare_number_branch_key = bool(data.get("bare_number_branch_key"))
+        self.ci_provider = data.get("ci_provider", "jira-ci-summary")
+        self.disabled_checks = frozenset(data.get("disabled_checks", ()))
+        self.labplan = bool(data.get("labplan"))
+        self.docs_dir = data.get("docs_dir")
+        self.commit_subject_key = data.get("commit_subject_key", "forbidden")
+        self.commands = data.get("commands", {})
+        self.static = data.get("static", {})
+        self.triage = data.get("triage", {})
+        self.not_checked = list(data.get("not_checked", ()))
+
+    @property
+    def key_n(self):
+        """The placeholder ticket key in messages: CASSANDRA-N, CASSSIDECAR-N."""
+        return f"{self.jira_keys[0]}-N"
+
+    @property
+    def key_placeholder(self):
+        """How a key is written where the text shows its form: CASSANDRA-NNNNN, CASSSIDECAR-N."""
+        return self.data.get("key_placeholder") or self.key_n
+
+    @functools.cached_property
+    def compat_surfaces(self):
+        return [(name, re.compile(rx)) for name, rx in self.data.get("compat_surfaces", ())]
+
+    @functools.cached_property
+    def static_scope(self):
+        """(main, test) regex lists for the Java files static analysis checks as main and test code."""
+        st = self.static
+        return [re.compile(r) for r in st.get("main", ())], [re.compile(r) for r in st.get("test", ())]
+
+    def static_kind(self, path):
+        """"main", "test" or None: which checkstyle config applies to a changed file."""
+        main, test = self.static_scope
+        if any(r.search(path) for r in main):
+            return "main"
+        if any(r.search(path) for r in test):
+            return "test"
+        return None
 
     @property
     def clone_name(self):
@@ -41,7 +79,8 @@ class Project:
 
     def summary(self):
         """The part of the profile the report model carries."""
-        return {"slug": self.slug, "repo": self.repo, "name": self.name, "suite_labels": self.paths.suite_labels()}
+        return {"slug": self.slug, "repo": self.repo, "name": self.name, "suite_labels": self.paths.suite_labels(),
+                "ci_provider": self.ci_provider}
 
     def __repr__(self):
         return f"Project({self.slug})"

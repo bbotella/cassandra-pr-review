@@ -29,7 +29,7 @@ def message_format(bundle, ctx):
         first = c["message"].splitlines()[0] if c["message"] else ""
         m = patch_by.search(c["message"])
         issues = []
-        if ctx.key and ctx.key.lower() in first.lower():
+        if ctx.key and ctx.key.lower() in first.lower() and ctx.project.commit_subject_key == "forbidden":
             issues.append("first line repeats the ticket key")
         if not m:
             issues.append(f"no `patch by …; reviewed by … for {key_n}` line")
@@ -68,7 +68,7 @@ def provenance(bundle, ctx):
         return Result("warn", "Signs of AI assistance without an `Assisted-by:` trailer",
                       rows + [ev(h) for h in hints],
                       action="If AI tools helped write this patch, add an `Assisted-by: <agent>:<model>` trailer "
-                             "(see AGENTS.md in apache/cassandra).")
+                             f"({ctx.project.commands.get('ai_trailer_source', 'see AGENTS.md in apache/cassandra')}).")
     summary = f"{len(rows)} trailer(s) found" if rows else "No co-author or AI trailers (none required)"
     return Result("pass", summary, rows)
 

@@ -10,7 +10,7 @@ import re
 import shutil
 import subprocess
 
-from cpr import paths
+from cpr import paths, project as project_mod
 from cpr.checks.compat import touched_surfaces
 from cpr.ingest.clone import CloneError, _git
 
@@ -158,11 +158,12 @@ def diff_text(bundle):
 
 def rank_files(bundle, cfg):
     """Production files by review risk, riskiest first: [{path, lines, risk, reasons}]."""
+    proj = project_mod.of(bundle)
     with open(TRIAGE) as f:
-        conc_paths = json.load(f)["concurrency_paths"]
+        conc_paths = {**json.load(f), **proj.triage}["concurrency_paths"]
     w = cfg["risk"]
-    prod = [f for f in _changed_code(bundle) if not paths.of(bundle).is_test(f["path"])]
-    surfaces = {p for ps in touched_surfaces([f["path"] for f in prod]).values() for p in ps}
+    prod = [f for f in _changed_code(bundle) if not proj.paths.is_test(f["path"])]
+    surfaces = {p for ps in touched_surfaces([f["path"] for f in prod], proj).values() for p in ps}
     ranked = []
     for f in prod:
         lines, mult, why = f["additions"] + f["deletions"], 1.0, []

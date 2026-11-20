@@ -3,7 +3,7 @@
 import json
 import os
 
-from cpr import paths
+from cpr import project as project_mod
 from cpr.checks import Context
 from cpr.checks.ci import upgrade_sensitive_files
 from cpr.checks.compat import touched_surfaces
@@ -25,7 +25,9 @@ def _band(value, bands):
 
 def triage(bundle, config=None):
     cfg = config or load_config()
-    pc = paths.of(bundle)
+    proj = project_mod.of(bundle)
+    cfg = {**cfg, **proj.triage}  # the project's own concurrency paths and high-risk surfaces
+    pc = proj.paths
     files = [f for f in bundle.get("files", []) if pc.counted(f)]
     lines = sum(f["additions"] + f["deletions"] for f in files)
     src_files = [f for f in files if pc.is_prod(f["path"])]
@@ -46,7 +48,7 @@ def triage(bundle, config=None):
     b = _band(len(subs), cfg["subsystems"])
     add("subsystems touched", ", ".join(subs) if subs else "none", b["points"] if b else 0)
 
-    surfaces = touched_surfaces([f["path"] for f in bundle.get("files", [])])
+    surfaces = touched_surfaces([f["path"] for f in bundle.get("files", [])], proj)
     add("compatibility surfaces", ", ".join(surfaces) if surfaces else "none",
         len(surfaces) * cfg["points_per_compat_surface"])
     hard = [s for s in surfaces if s in cfg["hard_surfaces"]]
