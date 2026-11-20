@@ -1,12 +1,16 @@
-"""Command line: `cpr review <PR number>`, `cpr prepare <PR number>`, `cpr build <PR number>`, and helpers."""
+"""Command line: `cpr review <PR>`, `cpr prepare <PR>`, `cpr build <PR>`, and helpers.
+
+A PR is `5201` (apache/cassandra, or the project given with --project), `sidecar#397`,
+`apache/cassandra-sidecar#397`, or a pull request URL.
+"""
 
 import argparse
 import json
 import os
 import sys
 
-from cpr import VERSION, buildresult, checks as checks_mod, context as context_mod, diffview, lenses as lenses_mod, model as model_mod, \
-    render, review as review_mod
+from cpr import VERSION, buildresult, checks as checks_mod, context as context_mod, diffview, layout, lenses as lenses_mod, \
+    model as model_mod, project as project_mod, render, review as review_mod
 from cpr.ingest import bundle as bundle_mod, clone
 from cpr.ingest.clone import CloneError
 from cpr.ingest.github import PRNotFound
@@ -17,13 +21,23 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def sha_dir(work_dir, bundle):
-    return os.path.join(bundle_mod.pr_dir(work_dir, bundle["pr"]["number"]), bundle["pr"]["head_sha"])
+    pr = bundle["pr"]
+    return os.path.join(layout.pr_dir(work_dir, project_mod.of(bundle).slug, pr["number"]), pr["head_sha"])
+
+
+def pr_ref(args):
+    """(Project, number) from the command's PR argument and --project. Raises ProjectError."""
+    return project_mod.parse_ref(args.pr, args.project)
+
+
+def label(proj, number):
+    return f"{proj.slug}#{number}"
 
 
 def build_report(bundle, work_dir, offline=False, review=None, log=print):
     # The saved `cpr build` result for exactly this head (None: not built for this head). Never builds here.
     pr = bundle["pr"]
-    bundle = {**bundle, "build": buildresult.load(work_dir, pr["number"], pr["head_sha"])}
+    bundle = {**bundle, "build": buildresult.load(work_dir, project_mod.of(bundle).slug, pr["number"], pr["head_sha"])}
     results = checks_mod.run_all(bundle)
     tri = triage(bundle)
     dv_cache = os.path.join(sha_dir(work_dir, bundle), "diffview.json")
@@ -115,17 +129,19 @@ def cmd_prepare(args):
     work_dir = os.path.abspath(args.work_dir)
     log = lambda m: print(f"  {m}", file=sys.stderr)  # noqa: E731
     try:
+        proj, number = pr_ref(args)
         if args.offline:
-            bundle = bundle_mod.load_cached(work_dir, args.pr)
+            bundle = bundle_mod.load_cached(work_dir, proj.slug, number)
         else:
-            bundle = bundle_mod.ingest(args.pr, work_dir, log=log)
+            bundle = bundle_mod.ingest(proj, number, work_dir, log=log)
             bundle_mod.save(bundle, work_dir)
-        wt = os.path.join(work_dir, "wt", str(args.pr))
-        clone.worktree(bundle["git"]["clone"], wt, args.pr, bundle["pr"]["head_sha"])
+        wt = layout.worktree(work_dir, proj.slug, number)
+        os.makedirs(os.path.dirname(wt), exist_ok=True)
+        clone.worktree(bundle["git"]["clone"], wt, number, bundle["pr"]["head_sha"])
     except PRNotFound as e:
         print(f"error: {e}", file=sys.stderr)
         return 2
-    except (bundle_mod.IngestError, NetError, CloneError) as e:
+    except (bundle_mod.IngestError, NetError, CloneError, project_mod.ProjectError) as e:
         print(f"error: {e}", file=sys.stderr)
         return 1
     d = sha_dir(work_dir, bundle)
@@ -139,7 +155,9 @@ def cmd_prepare(args):
         print(f"error: {e}", file=sys.stderr)
         return 1
     print(json.dumps({
-        "pr": args.pr,
+        "pr": number,
+        "project": proj.slug,
+        "repo": proj.repo,
         "title": bundle["pr"]["title"],
         "jira_key": bundle["jira_key"]["key"],
         "worktree": wt,
@@ -162,10 +180,11 @@ def cmd_review(args):
     work_dir = os.path.abspath(args.work_dir)
     log = (lambda *a: None) if args.quiet else (lambda m: print(f"  {m}", file=sys.stderr))
     try:
+        proj, number = pr_ref(args)
         if args.offline or args.lenses:
-            bundle = bundle_mod.load_cached(work_dir, args.pr)
+            bundle = bundle_mod.load_cached(work_dir, proj.slug, number)
         else:
-            bundle = bundle_mod.ingest(args.pr, work_dir, log=log)
+            bundle = bundle_mod.ingest(proj, number, work_dir, log=log)
             bundle_mod.save(bundle, work_dir)
         lens_dir = args.lenses
         if not lens_dir:
@@ -176,20 +195,21 @@ def cmd_review(args):
                 log(f"using saved code review lens results from {saved}")
         review = review_mod.merge(lens_dir) if lens_dir else None
         model = build_report(bundle, work_dir, offline=args.offline, review=review, log=log)
-        out = args.out or os.path.join(ROOT, "reports", str(args.pr), "index.html")
+        out = args.out or layout.report(ROOT, proj.slug, number)
         path = render.write(model, out)
         plan_path = write_plan(model, path)
     except PRNotFound as e:
         print(f"error: {e}", file=sys.stderr)
         return 2
-    except (bundle_mod.IngestError, NetError, CloneError, render.RenderError, model_mod.ModelError) as e:
+    except (bundle_mod.IngestError, NetError, CloneError, render.RenderError, model_mod.ModelError,
+            project_mod.ProjectError) as e:
         print(f"error: {e}", file=sys.stderr)
         return 1
     if args.model_out:
         with open(args.model_out, "w") as f:
             json.dump(model, f, indent=1)
     rec = model["recommendation"]
-    print(f"#{args.pr}: {rec['label']} · triage {model['triage']['rating']}")
+    print(f"{label(proj, number)}: {rec['label']} · triage {model['triage']['rating']}")
     if review:
         print("review: " + ", ".join(f"{l['name']}={l['status']}{'' if l['status'] != 'ran' else ('/approve' if l['approve'] else '/decline')}"
                                      for l in review["lenses"]) + f" · findings {review['counts']}")
@@ -218,7 +238,7 @@ def cmd_poll(args):
         return 0
 
     def review(number, out):
-        return main(["review", str(number), "--out", out, "--work-dir", work_dir, "--quiet"])
+        return main(["review", str(number), "--project", "cassandra", "--out", out, "--work-dir", work_dir, "--quiet"])
 
     outcomes = poll.refresh(picked, args.site, review, log=log)
     failed = [n for n, o in outcomes.items() if o.startswith("failed")]
@@ -229,20 +249,21 @@ def cmd_poll(args):
 def cmd_comment(args):
     from cpr import comment, site
     work_dir = os.path.abspath(args.work_dir)
-    report = args.report or os.path.join(ROOT, "reports", str(args.pr), "index.html")
     try:
+        proj, number = pr_ref(args)
+        report = args.report or layout.report(ROOT, proj.slug, number)
         if not os.path.exists(report):
-            raise comment.CommentError(f"no report at {report}: run cpr review {args.pr} first")
+            raise comment.CommentError(f"no report at {report}: run cpr review {label(proj, number)} first")
         model = site.read_model(report)
-        if not model or model["pr"]["number"] != args.pr:
-            raise comment.CommentError(f"{report} is not a report for PR {args.pr}")
-        p = comment.plan(args.pr, model)
+        if not model or model["pr"]["number"] != number or comment.model_project(model).slug != proj.slug:
+            raise comment.CommentError(f"{report} is not a report for {label(proj, number)}")
+        p = comment.plan(number, model)
         if not args.post:
             print(comment.describe(p))
             print("Dry run: nothing was written. Add --post to post.")
             return 0
         res = comment.post(p, work_dir, yes=args.yes)
-    except (comment.CommentError, NetError) as e:
+    except (comment.CommentError, NetError, project_mod.ProjectError) as e:
         print(f"error: {e}", file=sys.stderr)
         return 1
     print(f"{res['action']}: {res.get('url')}")
@@ -255,17 +276,22 @@ def cmd_build(args):
     work_dir = os.path.abspath(args.work_dir)
     log = lambda m: print(f"  {m}", file=sys.stderr)  # noqa: E731
     try:
-        bundle = bundle_mod.load_cached(work_dir, args.pr)
+        proj, number = pr_ref(args)
+        bundle = bundle_mod.load_cached(work_dir, proj.slug, number)
+    except project_mod.ProjectError as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 1
     except bundle_mod.IngestError:
-        print(f"error: PR #{args.pr} was never ingested in {work_dir}; run `cpr review {args.pr}` first", file=sys.stderr)
+        print(f"error: {label(proj, number)} was never ingested in {work_dir}; run `cpr review {label(proj, number)}` first",
+              file=sys.stderr)
         return 1
     decision = gate.decide(bundle, work_dir, approve=args.approve)
     if not decision["allowed"]:
         path, st = runner.not_built(bundle, work_dir, decision)
     else:
-        log(f"building #{args.pr} head {bundle['pr']['head_sha'][:8]} in the sandbox ({decision['reason']})")
+        log(f"building {label(proj, number)} head {bundle['pr']['head_sha'][:8]} in the sandbox ({decision['reason']})")
         path, st = runner.build(bundle, work_dir, build_pkg.load_config(), decision, root=ROOT, offline=args.offline, log=log)
-    print(f"#{args.pr}: {st['status']}" + (f" · {st['reason']}" if st.get("reason") else ""))
+    print(f"{label(proj, number)}: {st['status']}" + (f" · {st['reason']}" if st.get("reason") else ""))
     if st.get("tests"):
         t = st["tests"]
         print(f"tests: {t['run']} run, {t['failed']} failed, {t['errors']} errors, {t['skipped']} skipped in {t['classes']} classes")
@@ -330,30 +356,35 @@ def cmd_bench(args):
     return 3 if unlabelled and args.strict else 0
 
 
+def add_pr(parser):
+    parser.add_argument("pr", help="PR: 5201, sidecar#397, apache/cassandra-sidecar#397 or a pull request URL")
+    parser.add_argument("--project", help=f"project of a bare PR number: {', '.join(project_mod.slugs())} (default cassandra)")
+
+
 def main(argv=None):
-    parser = argparse.ArgumentParser(prog="cpr", description="Review an apache/cassandra pull request.")
+    parser = argparse.ArgumentParser(prog="cpr", description="Review a pull request of apache/cassandra or its subprojects (sidecar, analytics).")
     parser.add_argument("--version", action="version", version=f"cpr {VERSION}")
     sub = parser.add_subparsers(dest="command", required=True)
     default_work = os.path.join(ROOT, ".work")
 
     rv = sub.add_parser("review", help="review one PR and write an HTML report")
-    rv.add_argument("pr", type=int, help="apache/cassandra PR number")
+    add_pr(rv)
     rv.add_argument("--offline", action="store_true", help="re-render from the cached ingest; no network")
     rv.add_argument("--lenses", help="directory of code review lens outputs to merge (uses the cached ingest)")
-    rv.add_argument("--out", help="output path (default reports/<PR>/index.html)")
+    rv.add_argument("--out", help="output path (default reports/<project>/<PR>/index.html)")
     rv.add_argument("--work-dir", default=default_work, help="cache and clone directory")
     rv.add_argument("--model-out", help="also write the report model JSON here")
     rv.add_argument("--quiet", action="store_true")
     rv.set_defaults(func=cmd_review)
 
     pp = sub.add_parser("prepare", help="ingest a PR and check it out for code review lenses; prints JSON")
-    pp.add_argument("pr", type=int)
+    add_pr(pp)
     pp.add_argument("--offline", action="store_true", help="use the cached ingest")
     pp.add_argument("--work-dir", default=default_work)
     pp.set_defaults(func=cmd_prepare)
 
     bd = sub.add_parser("build", help="build a PR in a sandbox, run selected tests with JaCoCo, save status.json")
-    bd.add_argument("pr", type=int)
+    add_pr(bd)
     bd.add_argument("--approve", action="store_true", help="the owner approves building this exact head sha")
     bd.add_argument("--offline", action="store_true", help="skip the networked dependency resolve at the merge-base")
     bd.add_argument("--work-dir", default=default_work)
@@ -367,10 +398,10 @@ def main(argv=None):
     pl.set_defaults(func=cmd_poll)
 
     cm = sub.add_parser("comment", help="build the report-link comment for a PR; --post posts or edits it")
-    cm.add_argument("pr", type=int)
+    add_pr(cm)
     cm.add_argument("--post", action="store_true", help="post (or edit our earlier comment) as the gh account")
     cm.add_argument("--yes", action="store_true", help="confirm posting without a terminal prompt")
-    cm.add_argument("--report", help="rendered report (default reports/<PR>/index.html)")
+    cm.add_argument("--report", help="rendered report (default reports/<project>/<PR>/index.html)")
     cm.add_argument("--work-dir", default=default_work)
     cm.set_defaults(func=cmd_comment)
 
@@ -399,4 +430,9 @@ def main(argv=None):
     bn.set_defaults(func=cmd_bench)
 
     args = parser.parse_args(argv)
+    if getattr(args, "work_dir", None):
+        # This checkout's reports/ belongs with its own .work; another work dir (tests, CI) migrates only itself.
+        work = os.path.abspath(args.work_dir)
+        layout.migrate(work, layout.reports_dir(ROOT) if work == os.path.abspath(default_work) else None,
+                       log=lambda m: print(f"  {m}", file=sys.stderr))
     return args.func(args)

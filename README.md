@@ -7,10 +7,19 @@ patch is ready to merge, what is missing and who has to act, and how hard it wil
 ## Usage
 
 ```
-bin/cpr review 5201              # fetch, check, and write reports/5201/index.html
+bin/cpr review 5201              # fetch, check, and write reports/cassandra/5201/index.html
 bin/cpr review 5201 --offline    # re-render from the cached ingest, no network
 bin/cpr review 5201 --model-out model.json   # also write the report model
 ```
+
+A PR of [apache/cassandra-sidecar](https://github.com/apache/cassandra-sidecar) or
+[apache/cassandra-analytics](https://github.com/apache/cassandra-analytics) is named `sidecar#397` or
+`analytics#260` (or `apache/cassandra-sidecar#397`, a PR URL, or `397 --project sidecar`). Sibling
+reports are preliminary: the path layout, ticket keys and credit lines are the project's own, but CI,
+static analysis, compatibility checks, code review and builds still follow Cassandra's rules, and the
+published site and `cpr comment` cover apache/cassandra only. Each project keeps its own data under
+`.work/pr/<project>/`, `.work/build-runs/<project>/` and `reports/<project>/`; data from before projects
+existed is moved there on the first run.
 
 For a full report with AI code review and build results, run `/review-pr 5201` in Claude Code from
 this repo. It runs `cpr prepare`, starts `cpr build` in the background when the author is a

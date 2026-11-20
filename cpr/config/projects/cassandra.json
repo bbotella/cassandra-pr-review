@@ -1,0 +1,30 @@
+{
+ "_comment": "apache/cassandra. The paths section reproduces the layout rules cpr has always applied; regexes are searched against repo-relative paths. Fields: openspec/changes/project-profiles/design.md.",
+ "slug": "cassandra",
+ "repo": "apache/cassandra",
+ "name": "Cassandra",
+ "jira_keys": ["CASSANDRA"],
+ "key_digits": 3,
+ "bare_number_branch_key": true,
+ "paths": {
+  "prod": ["^src/java/", "^pylib/"],
+  "test": ["^test/", "/test/", "^pylib/cqlshlib/test/"],
+  "test_resources": ["^test/resources/", "^test/data/", "^test/conf/"],
+  "generated": ["^src/gen-java/", "\\.(db|bin)$", "/gen/"],
+  "doc": ["^doc/", "^(?!src/).*\\.(adoc|md)$"],
+  "build": ["^\\.build/", "^\\.circleci/", "^\\.jenkins/", "^build\\.xml", "^ide/", "^\\.github/"],
+  "suites": [
+   ["^test/unit/", "unit", "Unit (test/unit)"],
+   ["^test/distributed/", "distributed", "In-JVM dtest (test/distributed)"],
+   ["^test/burn/", "burn", "Burn (test/burn)"],
+   ["^test/long/", "long", "Long (test/long)"],
+   ["^test/microbench/", "microbench", "Microbench (test/microbench)"],
+   ["^test/simulator/", "simulator", "Simulator (test/simulator)"],
+   ["^test/harry/", "harry", "Harry (test/harry)"],
+   ["^test/memory/", "memory", "Memory (test/memory)"],
+   ["^test/anttasks/", "anttasks", "Ant tasks (test/anttasks)"],
+   ["^pylib/cqlshlib/test/", "cqlsh", "cqlsh (pylib/cqlshlib/test)"]
+  ],
+  "subsystem": {"kind": "package", "root": "org/apache/cassandra/"}
+ }
+}

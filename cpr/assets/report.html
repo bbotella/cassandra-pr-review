@@ -381,7 +381,7 @@ body.no-data #no-data { display: block; }
   <div class="navcol">
     <nav id="nav" aria-label="Report sections">
       <div class="nav-head">
-        <div class="eyebrow">Cassandra PR review</div>
+        <div class="eyebrow" id="nav-eyebrow">Cassandra PR review</div>
         <span id="nav-pr"></span>
         <span id="nav-pill"></span>
         <button type="button" id="nav-toggle" aria-expanded="false" aria-controls="nav-body">Sections</button>
@@ -722,6 +722,8 @@ body.no-data #no-data { display: block; }
   }
   var V = M.view || {};
   var pr = M.pr || {};
+  // Reports rendered before project profiles have no `project`: they are apache/cassandra.
+  var project = M.project || { slug: "cassandra", repo: "apache/cassandra", name: "Cassandra", suite_labels: {} };
   var checks = Array.isArray(M.checks) ? M.checks : [];
   var checkById = {};
   checks.forEach(function (c) { checkById[c.id] = c; });
@@ -730,17 +732,11 @@ body.no-data #no-data { display: block; }
   var words = V.words || {};
   function checkWord(c) { return words[c.id] || STATUS_WORD[c.status] || "Unknown"; }
 
-  var TEST_SUITES = [
-    ["test/unit/", "Unit (test/unit)"], ["test/distributed/", "In-JVM dtest (test/distributed)"],
-    ["test/burn/", "Burn (test/burn)"], ["test/long/", "Long (test/long)"],
-    ["test/microbench/", "Microbench (test/microbench)"], ["test/simulator/", "Simulator (test/simulator)"],
-    ["test/harry/", "Harry (test/harry)"], ["test/memory/", "Memory (test/memory)"],
-    ["test/anttasks/", "Ant tasks (test/anttasks)"], ["pylib/cqlshlib/test/", "cqlsh (pylib/cqlshlib/test)"]
-  ];
-  function isTest(p) { return p.indexOf("test/") === 0 || p.indexOf("/test/") !== -1; }
-  function testSuite(p) {
-    for (var i = 0; i < TEST_SUITES.length; i++) if (p.indexOf(TEST_SUITES[i][0]) === 0) return TEST_SUITES[i][1];
-    return isTest(p) ? "Other tests" : null;
+  // Each file's suite is classified by the tool with the project's layout; the labels come from the project too.
+  function testSuite(f) {
+    if (!f.suite) return null;
+    var labels = project.suite_labels || {};
+    return Object.prototype.hasOwnProperty.call(labels, f.suite) ? labels[f.suite] : (f.suite === "other" ? "Other tests" : f.suite);
   }
   function fileLines(f) { return (Number(f.additions) || 0) + (Number(f.deletions) || 0); }
   function prCommitUrl(sha) {
@@ -934,7 +930,7 @@ body.no-data #no-data { display: block; }
     var files = M.files || [];
     var groups = {}, order = [], prodLines = 0, testLines = 0, prodFiles = 0;
     files.forEach(function (f) {
-      var s = testSuite(f.path || "");
+      var s = testSuite(f);
       if (s) {
         testLines += fileLines(f);
         if (!groups[s]) { groups[s] = []; order.push(s); }
@@ -1175,7 +1171,7 @@ body.no-data #no-data { display: block; }
     var wrap = document.getElementById("header");
     var facts = h("div", "facts");
     append(facts, link(pr.url, "#" + pr.number));
-    append(facts, h("span", null, ["into ", link(ghTree("apache/cassandra", pr.base), pr.base || "?", "mono")]));
+    append(facts, h("span", null, ["into ", link(ghTree(project.repo, pr.base), pr.base || "?", "mono")]));
     append(facts, h("span", null, ["by ", link(ghUser(pr.author), pr.author || "unknown"),
       (V.header && V.header.first_time_contributor) ? " (first-time contributor)" :
         (pr.author_association ? " (" + String(pr.author_association).toLowerCase().replace(/_/g, " ") + ")" : "")]));
@@ -1866,7 +1862,9 @@ body.no-data #no-data { display: block; }
   // -------------------------------------------------------------------------
   // Build the page
   // -------------------------------------------------------------------------
-  document.title = "PR #" + pr.number + ": " + (pr.title || "") + " — Cassandra PR review";
+  document.title = "PR #" + pr.number + ": " + (pr.title || "") + " — " + project.name + " PR review";
+  var eyebrow = document.getElementById("nav-eyebrow");
+  if (eyebrow) eyebrow.textContent = project.name + " PR review";
   append(document.getElementById("nav-pr"), (function () { var a = link(pr.url, "PR #" + pr.number, "nav-pr"); return a; })());
   append(document.getElementById("nav-pill"), h("span", "chip pill s-" + vKind, verdict.headline));
 

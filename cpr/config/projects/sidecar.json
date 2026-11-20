@@ -1,0 +1,25 @@
+{
+ "_comment": "apache/cassandra-sidecar: Gradle multi-module (server, client, client-common, adapters/*, ...), tests in src/{test,integrationTest,containerTest,testFixtures}. CASSANDRASC is the project's former JIRA key.",
+ "slug": "sidecar",
+ "repo": "apache/cassandra-sidecar",
+ "name": "Cassandra Sidecar",
+ "jira_keys": ["CASSSIDECAR", "CASSANDRASC"],
+ "key_digits": 1,
+ "bare_number_branch_key": false,
+ "paths": {
+  "prod": ["(^|/)src/main/"],
+  "test": ["(^|/)src/(test|integrationTest|containerTest|testFixtures)/", "^(integration-tests|integration-framework|test-common)/"],
+  "test_resources": ["(^|/)src/(test|integrationTest|containerTest|testFixtures)/resources/"],
+  "generated": ["(^|/)build/generated/", "\\.(db|bin)$"],
+  "doc": ["^docs/", "^(?!(.*/)?src/).*\\.(adoc|md)$"],
+  "build": ["^\\.github/", "^\\.circleci/", "^gradle/", "^scripts/", "^githooks/", "(^|/)build\\.gradle$", "^settings\\.gradle$", "^gradle\\.properties$", "^gradlew(\\.bat)?$"],
+  "suites": [
+   ["^integration-tests/", "integration", "Integration (integration-tests)"],
+   ["(^|/)src/integrationTest/", "integration", "Integration (src/integrationTest)"],
+   ["(^|/)src/containerTest/", "container", "Container (src/containerTest)"],
+   ["(^|/)src/testFixtures/", "fixtures", "Test fixtures (src/testFixtures)"],
+   ["(^|/)src/test/", "unit", "Unit (src/test)"]
+  ],
+  "subsystem": {"kind": "module"}
+ }
+}

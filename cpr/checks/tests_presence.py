@@ -4,13 +4,13 @@ from cpr import paths
 from cpr.checks import Result, check, ev
 
 
-def test_summary(files):
-    prod_lines = sum(f["additions"] + f["deletions"] for f in files if paths.is_prod(f["path"]))
+def test_summary(files, classify=paths):
+    prod_lines = sum(f["additions"] + f["deletions"] for f in files if classify.is_prod(f["path"]))
     test_lines = sum(f["additions"] + f["deletions"] for f in files
-                     if paths.is_test(f["path"]) and not paths.is_test_resource(f["path"]))
+                     if classify.is_test(f["path"]) and not classify.is_test_resource(f["path"]))
     suites = {}
     for f in files:
-        s = paths.test_suite(f["path"])
+        s = classify.test_suite(f["path"])
         if s:
             suites.setdefault(s, []).append(f["path"])
     return prod_lines, test_lines, suites
@@ -19,7 +19,7 @@ def test_summary(files):
 @check("tests.present", "Tests accompany production changes", "tests", "testing", blocking=True)
 def present(bundle, ctx):
     files = ctx.files
-    prod_lines, test_lines, suites = test_summary(files)
+    prod_lines, test_lines, suites = test_summary(files, ctx.classify)
     if prod_lines == 0:
         return Result("not-applicable", "No production code changed")
     rows = [ev(f"production lines changed: {prod_lines}; test lines changed: {test_lines}")]

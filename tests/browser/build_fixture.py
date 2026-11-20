@@ -150,7 +150,7 @@ def build_site(out_dir, model):
     reports = os.path.join(out_dir, "site-reports")
     for name in ("4967-huge.json.gz", "5201-backport-set.json.gz", "5212-no-jira.json.gz", "5228-stale-ci.json.gz", "5238-draft.json.gz"):
         m = bundle_model(name)
-        render.write(m, os.path.join(reports, str(m["pr"]["number"]), "index.html"))
+        render.write(m, os.path.join(reports, "cassandra", str(m["pr"]["number"]), "index.html"))
     # Two more reports so every kind of group exists: nothing left for the contributor, and a read failure.
     for number, verdict in ((6001, "awaiting-review"), (6002, "insufficient-evidence")):
         m = bundle_model("5212-no-jira.json.gz")
@@ -159,7 +159,7 @@ def build_site(out_dir, model):
             c["status"], c["action_required"] = "pass", False
         m["recommendation"] = {**m["recommendation"], "verdict": verdict, "reasons": []}
         m.pop("view", None)
-        render.write(m, os.path.join(reports, str(number), "index.html"))
+        render.write(m, os.path.join(reports, "cassandra", str(number), "index.html"))
     rows = site.build(reports, os.path.join(out_dir, "site"))
     return os.path.join(out_dir, "site", "index.html"), rows
 

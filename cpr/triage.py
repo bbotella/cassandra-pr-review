@@ -25,9 +25,10 @@ def _band(value, bands):
 
 def triage(bundle, config=None):
     cfg = config or load_config()
-    files = [f for f in bundle.get("files", []) if paths.counted(f)]
+    pc = paths.of(bundle)
+    files = [f for f in bundle.get("files", []) if pc.counted(f)]
     lines = sum(f["additions"] + f["deletions"] for f in files)
-    src_files = [f for f in files if paths.is_prod(f["path"])]
+    src_files = [f for f in files if pc.is_prod(f["path"])]
     src_lines = sum(f["additions"] + f["deletions"] for f in src_files)
     signals, points, forced = [], 0, None
 
@@ -41,7 +42,7 @@ def triage(bundle, config=None):
     b = _band(len(files), cfg["files"])
     add("changed files", len(files), b["points"] if b else 0)
 
-    subs = sorted({s for s in (paths.subsystem(f["path"]) for f in src_files) if s})
+    subs = sorted({s for s in (pc.subsystem(f["path"]) for f in src_files) if s})
     b = _band(len(subs), cfg["subsystems"])
     add("subsystems touched", ", ".join(subs) if subs else "none", b["points"] if b else 0)
 
@@ -62,7 +63,7 @@ def triage(bundle, config=None):
     b = _band(len(targets), cfg["branches"])
     add("target branches", len(targets), b["points"] if b else 0)
 
-    has_tests = any(paths.test_suite(f["path"]) for f in bundle.get("files", []))
+    has_tests = any(pc.test_suite(f["path"]) for f in bundle.get("files", []))
     no_tests = bool(src_files) and not has_tests
     add("production code without tests", "yes" if no_tests else "no", cfg["points_no_tests"] if no_tests else 0)
 

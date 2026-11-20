@@ -112,6 +112,30 @@ def bundle(**kw):
     return copy.deepcopy(b)
 
 
+def sidecar_bundle(**kw):
+    """A sidecar PR: Gradle modules, CASSSIDECAR key, trunk only, credit line with a markdown-link key."""
+    files = [("server/src/main/java/org/apache/cassandra/sidecar/routes/FooHandler.java", ["int x = 1;"], False),
+             ("server/src/test/java/org/apache/cassandra/sidecar/routes/FooHandlerTest.java", ["@Test void t() {}"], False),
+             ("CHANGES.txt", [" * Fix the foo handler (CASSSIDECAR-378)"], False)]
+    b = with_files(bundle(), files)
+    b["meta"] = {**b["meta"], "project": "sidecar", "repo": "apache/cassandra-sidecar"}
+    b["pr"] = {**b["pr"], "number": 397, "url": "https://github.com/apache/cassandra-sidecar/pull/397",
+               "title": "CASSSIDECAR-378: Fix the foo handler", "base": "trunk", "head_ref": "CASSSIDECAR-378",
+               "head_repo": "alice/cassandra-sidecar"}
+    b["commits"] = [{**b["commits"][0], "message": "CASSSIDECAR-378: Fix the foo handler (#397)\n\nPatch by Alice; "
+                     "Reviewed by Bob, Carol for [CASSSIDECAR-378](https://issues.apache.org/jira/browse/CASSSIDECAR-378)"}]
+    b["jira_key"] = {"key": "CASSSIDECAR-378", "sources": ["title", "branch"], "conflicts": [],
+                     "mentioned": ["CASSSIDECAR-378"]}
+    b["jira"] = {**b["jira"], "ticket": {**b["jira"]["ticket"], "key": "CASSSIDECAR-378",
+                                          "url": "https://issues.apache.org/jira/browse/CASSSIDECAR-378",
+                                          "fix_versions": ["0.5.0"], "components": []}}
+    b["siblings"] = [{**b["siblings"][0], "number": 397, "url": b["pr"]["url"], "base": "trunk"}]
+    b["release_branches"] = ["trunk"]
+    for k, v in kw.items():
+        b[k] = {**b[k], **v} if isinstance(v, dict) and isinstance(b.get(k), dict) else v
+    return copy.deepcopy(b)
+
+
 def with_files(b, files):
     """Replace files and diff. `files` is [(path, added_lines, new_file)]."""
     b["files"] = [{"path": p, "previous_path": None, "status": "A" if new else "M", "additions": len(lines),

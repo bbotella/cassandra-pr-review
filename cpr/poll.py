@@ -10,16 +10,17 @@ import subprocess
 import tempfile
 import time
 
-from cpr import REPO, site
+from cpr import project as project_mod, site
 from cpr.net import gh_json
 
 DEFAULT_LIMIT = 25
 STALE_DRAFT_DAYS = 30
 
 
-def fetch_open(recorder=None):
+def fetch_open(recorder=None, repo=None):
     """Open PRs as returned by the GitHub list endpoint (number, head.sha, draft, updated_at, ...)."""
-    return gh_json(f"repos/{REPO}/pulls?state=open&per_page=100", recorder=recorder, paginate=True) or []
+    repo = repo or project_mod.load(project_mod.DEFAULT).repo
+    return gh_json(f"repos/{repo}/pulls?state=open&per_page=100", recorder=recorder, paginate=True) or []
 
 
 def _epoch(ts):

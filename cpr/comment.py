@@ -11,7 +11,7 @@ import subprocess
 import sys
 import tempfile
 
-from cpr import REPO, VERSION, net, site
+from cpr import VERSION, net, project as project_mod, site
 from cpr.ingest import bundle as bundle_mod
 
 PAGES_BASE = "https://pmcfadin.github.io/cassandra-pr-review/pr"
@@ -115,8 +115,14 @@ def _flatten(v):
     return [v]
 
 
-def _comments(number):
-    text = run_gh(["api", f"repos/{REPO}/issues/{number}/comments", "--paginate", "--slurp"])
+def model_project(model):
+    """The report's project; reports rendered before projects existed are apache/cassandra."""
+    slug = (model.get("project") or {}).get("slug")
+    return project_mod.load(slug or project_mod.DEFAULT)
+
+
+def _comments(repo, number):
+    text = run_gh(["api", f"repos/{repo}/issues/{number}/comments", "--paginate", "--slurp"])
     return [c for v in _json_values(text) for c in _flatten(v)]
 
 
@@ -134,13 +140,17 @@ def _norm(s):
 
 def plan(number, model):
     """Read-only: build the body, look at GitHub and Pages, return what would happen and what blocks it."""
+    proj = model_project(model)
+    if proj.slug != project_mod.DEFAULT:
+        raise CommentError(f"the published site has no {proj.name} reports yet, so there is nothing to link to")
+    repo = proj.repo
     body = build_body(model)
     head = model["pr"]["head_sha"]
     problems = []
     if not model["recommendation"]["reasons"]:
         problems.append("the recommendation has no reasons to show")
     login = run_gh(["api", "user", "--jq", ".login"]).strip()
-    current = json.loads(run_gh(["pr", "view", str(number), "-R", REPO, "--json", "headRefOid"]))["headRefOid"]
+    current = json.loads(run_gh(["pr", "view", str(number), "-R", repo, "--json", "headRefOid"]))["headRefOid"]
     if current != head:
         problems.append(f"local report is for head {head[:9]} but the PR is at {current[:9]}: re-run cpr review")
     live_head, page_error = None, None
@@ -156,19 +166,20 @@ def plan(number, model):
         problems.append(PUBLISH_FIRST + " (no published report)")
     elif live_head != head:
         problems.append(f"{PUBLISH_FIRST} (Pages shows head {live_head[:9]}, local is {head[:9]})")
-    existing = find_own(_comments(number), number, login)
+    existing = find_own(_comments(repo, number), number, login)
     if existing is None:
         action = "create"
     elif _norm(existing.get("body")) == _norm(body):
         action = "unchanged"
     else:
         action = "edit"
-    return {"number": number, "body": body, "head": head, "login": login, "existing": existing,
+    return {"number": number, "repo": repo, "slug": proj.slug, "body": body, "head": head, "login": login,
+            "existing": existing,
             "action": action, "problems": problems}
 
 
 def describe(p):
-    verb = {"create": f"create a new comment on {REPO} #{p['number']}",
+    verb = {"create": f"create a new comment on {p['repo']} #{p['number']}",
             "edit": f"edit the existing comment {(p['existing'] or {}).get('html_url')}",
             "unchanged": "do nothing: the existing comment is already up to date"}[p["action"]]
     lines = [p["body"], "", f"--- {len(p['body'])} characters; as {p['login']}", f"Would {verb}."]
@@ -176,8 +187,8 @@ def describe(p):
     return "\n".join(lines)
 
 
-def comment_json_path(work_dir, number):
-    return os.path.join(bundle_mod.pr_dir(work_dir, number), "comment.json")
+def comment_json_path(work_dir, slug, number):
+    return os.path.join(bundle_mod.pr_dir(work_dir, slug, number), "comment.json")
 
 
 def post(p, work_dir, yes=False, is_tty=None, ask=input, now=None):
@@ -190,23 +201,23 @@ def post(p, work_dir, yes=False, is_tty=None, ask=input, now=None):
     if not yes:
         if not tty:
             raise CommentError("no terminal to confirm on: pass --yes to post")
-        if ask(f"Post to {REPO} #{p['number']} as {p['login']}? [y/N] ").strip().lower() not in ("y", "yes"):
+        if ask(f"Post to {p['repo']} #{p['number']} as {p['login']}? [y/N] ").strip().lower() not in ("y", "yes"):
             raise CommentError("not confirmed; nothing posted")
     with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False) as f:
         f.write(p["body"])
         path = f.name
     try:
         if p["action"] == "edit":
-            out = run_gh(["api", "-X", "PATCH", f"repos/{REPO}/issues/comments/{p['existing']['id']}",
+            out = run_gh(["api", "-X", "PATCH", f"repos/{p['repo']}/issues/comments/{p['existing']['id']}",
                           "-F", f"body=@{path}"])
         else:
-            out = run_gh(["api", "-X", "POST", f"repos/{REPO}/issues/{p['number']}/comments", "-F", f"body=@{path}"])
+            out = run_gh(["api", "-X", "POST", f"repos/{p['repo']}/issues/{p['number']}/comments", "-F", f"body=@{path}"])
     finally:
         os.unlink(path)
     res = json.loads(out)
     when = (now or datetime.datetime.now(datetime.timezone.utc)).strftime("%Y-%m-%dT%H:%M:%SZ")
     rec = {"comment_id": res["id"], "url": res.get("html_url"), "head": p["head"], "posted_at": when}
-    target = comment_json_path(work_dir, p["number"])
+    target = comment_json_path(work_dir, p["slug"], p["number"])
     os.makedirs(os.path.dirname(target), exist_ok=True)
     with open(target, "w") as f:
         json.dump(rec, f, indent=1)

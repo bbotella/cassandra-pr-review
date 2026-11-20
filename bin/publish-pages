@@ -1,5 +1,5 @@
 #!/bin/sh
-# Merge local reports/ into the published GitHub Pages site and push the gh-pages branch.
+# Merge local reports/cassandra/ into the published GitHub Pages site and push the gh-pages branch.
 # The site branch holds only generated files; main never contains reports.
 #
 # The scheduled workflow also publishes reports for many PRs, so this starts from the current

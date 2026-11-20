@@ -87,8 +87,10 @@ class Context:
     """Derived views of the bundle shared by several checks."""
 
     def __init__(self, bundle):
-        from cpr import diffparse
+        from cpr import diffparse, project
         self.bundle = bundle
+        self.project = project.of(bundle)
+        self.classify = self.project.paths  # path classifier; `paths` below is the list of changed paths
         self.files = bundle.get("files", [])
         self.paths = [f["path"] for f in self.files]
         self.added = diffparse.parse(bundle.get("diff", ""))

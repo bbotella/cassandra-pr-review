@@ -2,7 +2,8 @@
 
 A rule that fires in at least `house_style_share` of the branch's files is "house style differs": the code
 itself does not follow it, so a PR that breaks it is not news. The baseline scores the base branch's whole
-`src/java` once and is cached under `<work>/static-cache/` by branch, tip sha, PMD id and ruleset hash.
+`src/java` once and is cached under `<work>/static-cache/baselines/<repo>/` by branch, tip sha, PMD id and
+ruleset hash.
 
 Order of use: the exact cached baseline; else a baseline for the same branch built less than seven days ago
 (the tip moved; logged); else build one within its own time cap; else the density in the base versions of the

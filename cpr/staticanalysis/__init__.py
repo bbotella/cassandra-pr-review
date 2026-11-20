@@ -11,6 +11,7 @@ import os
 import shutil
 import time
 
+from cpr import layout, project as project_mod
 from cpr.ingest import clone as clone_mod
 from cpr.staticanalysis import auxpath, baseline, classify, inputs, rate, ruleset as ruleset_mod, run, tools, typerules
 
@@ -116,14 +117,15 @@ def _analyze(bundle, work_dir, log):
         out = unavailable("no changed Java files", base_branch, status="not-applicable")
         out["commits"] = commits
         return out
-    sd = os.path.join(work_dir, "pr", str(number), pr["head_sha"], "static")
+    slug = project_mod.of(bundle).slug
+    sd = os.path.join(layout.pr_dir(work_dir, slug, number), pr["head_sha"], "static")
     base_ref = clone_mod.base_ref(base_branch)
     cs_id, pmd_id = tools.checkstyle_id(cfg, base_branch), cfg["pmd"]
     cfgs = run.fetch_configs(repo, base_ref, os.path.join(sd, "cfg"))
     ruleset = os.path.join(os.path.dirname(tools.CONFIG), "pmd-pr.xml")
     cs_sha = sha_text(*[_read(p) for _, p in sorted((cfgs or {}).items())])
     pmd_sha = sha_text(_read(ruleset), json.dumps(cfg["thresholds"], sort_keys=True))
-    aux_cp, aux_note = auxpath.resolve(work_dir, number, pr["head_sha"])
+    aux_cp, aux_note = auxpath.resolve(work_dir, slug, number, pr["head_sha"])
     java_cache = {}
     cs_ok = cs_id and tools.is_installed(work_dir, cs_id) and cfgs
     pmd_ok = tools.is_installed(work_dir, pmd_id)
@@ -282,7 +284,9 @@ def _rules(cfg, work_dir, repo, base_branch, changed, base_files, head_files, he
     base_ref = clone_mod.base_ref(base_branch)
     tip = clone_mod._git(repo, "rev-parse", base_ref).strip()
     caps = cfg["caps"]
-    data, source, note = baseline.obtain(os.path.join(work_dir, "static-cache"), repo, base_ref, base_branch, tip, pmd_bin,
+    # Baselines are per repository (the clone's directory name): every project has a `trunk`.
+    cache_dir = os.path.join(work_dir, "static-cache", "baselines", os.path.basename(os.path.normpath(repo)))
+    data, source, note = baseline.obtain(cache_dir, repo, base_ref, base_branch, tip, pmd_bin,
                                          env, text, pmd_id, pmd_sha, caps["baseline_seconds"], caps["pmd_threads"],
                                          cfg["exclude"], log)
     if data is None:

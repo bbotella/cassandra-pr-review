@@ -1,0 +1,24 @@
+{
+ "_comment": "apache/cassandra-analytics: Gradle multi-module (cassandra-analytics-core, cassandra-bridge, cassandra-*-zero bridges, ...); variant source dirs such as src/main/scala-2.13-spark-4 hold Java too.",
+ "slug": "analytics",
+ "repo": "apache/cassandra-analytics",
+ "name": "Cassandra Analytics",
+ "jira_keys": ["CASSANALYTICS"],
+ "key_digits": 1,
+ "bare_number_branch_key": false,
+ "paths": {
+  "prod": ["(^|/)src/main/"],
+  "test": ["(^|/)src/(test|testFixtures)[^/]*/", "^cassandra-analytics-integration-(tests|framework)/"],
+  "test_resources": ["(^|/)src/(test|testFixtures)[^/]*/resources/"],
+  "generated": ["(^|/)build/generated/", "\\.(db|bin)$"],
+  "doc": ["^docs/", "^(?!(.*/)?src/).*\\.(adoc|md)$"],
+  "build": ["^\\.github/", "^\\.circleci/", "^gradle/", "^scripts/", "^githooks/", "^profiles/", "(^|/)build\\.gradle$", "^settings\\.gradle$", "^gradle\\.properties$", "^gradlew(\\.bat)?$"],
+  "suites": [
+   ["^cassandra-analytics-integration-tests/", "integration", "Integration (cassandra-analytics-integration-tests)"],
+   ["^cassandra-analytics-integration-framework/", "fixtures", "Integration framework"],
+   ["(^|/)src/testFixtures[^/]*/", "fixtures", "Test fixtures (src/testFixtures)"],
+   ["(^|/)src/test[^/]*/", "unit", "Unit (src/test)"]
+  ],
+  "subsystem": {"kind": "module"}
+ }
+}

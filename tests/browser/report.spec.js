@@ -459,6 +459,7 @@ test("report and index share the design tokens and fonts", async ({ page }) => {
 test("index groups PRs by who acts next, with a count per group and chips only when something ran", async ({ page }) => {
   const f = fixtures();
   const titles = { reviewers: "Waiting on reviewers", contributor: "Waiting on the contributor", unknown: "Cannot tell yet", draft: "Drafts" };
+  expect(Object.keys(f.index_groups).length, "the fixture index has reports").toBeGreaterThan(1);
   for (const [width, height] of [[1280, 900], [390, 844]]) {
     await page.setViewportSize({ width, height });
     await page.goto(fileUrl(f.index));

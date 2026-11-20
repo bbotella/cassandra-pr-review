@@ -16,9 +16,9 @@ class Site(unittest.TestCase):
             b = bundle()
             b["pr"]["title"] = "<script>alert(1)</script> Fix things"
             m = model.build(b, checks.run_all(b), triage(b), render.load_docs(), diffview.unavailable("x"))
-            render.write(m, os.path.join(d, "reports", "5198", "index.html"))
-            os.makedirs(os.path.join(d, "reports", "junk"))
-            with open(os.path.join(d, "reports", "junk", "index.html"), "w") as f:
+            render.write(m, os.path.join(d, "reports", "cassandra", "5198", "index.html"))
+            os.makedirs(os.path.join(d, "reports", "cassandra", "junk"))
+            with open(os.path.join(d, "reports", "cassandra", "junk", "index.html"), "w") as f:
                 f.write("not a report")
             out = os.path.join(d, "site")
             os.makedirs(out)
@@ -156,8 +156,17 @@ class Merge(unittest.TestCase):
         os.makedirs(self.site)
 
     def local(self, number=5198, **kw):
-        path = make_report(os.path.join(self.d, "reports", str(number), "index.html"), number=number, **kw)
-        return os.path.dirname(os.path.dirname(path))
+        path = make_report(os.path.join(self.d, "reports", "cassandra", str(number), "index.html"), number=number, **kw)
+        return os.path.dirname(os.path.dirname(os.path.dirname(path)))
+
+    def test_other_projects_are_not_published_yet(self):
+        from tests.helpers import sidecar_bundle
+        b = sidecar_bundle()
+        m = model.build(b, checks.run_all(b), triage(b), render.load_docs(), diffview.unavailable("x"))
+        render.write(m, os.path.join(self.d, "reports", "sidecar", "397", "index.html"))
+        self.assertEqual(site.merge(os.path.join(self.d, "reports"), self.site)[1], {})
+        self.assertEqual(site.merge_report(self.site, os.path.join(self.d, "reports", "sidecar", "397", "index.html")),
+                         (None, "skipped"))
 
     def put(self, number=5198, **kw):
         make_report(os.path.join(self.site, "pr", str(number), "index.html"), number=number, **kw)

@@ -16,6 +16,7 @@ import shutil
 import time
 import xml.etree.ElementTree as ET
 
+from cpr import project as project_mod
 from cpr.build import coverage, run_dir, sandbox, select
 from cpr.staticanalysis.run import execute
 
@@ -257,17 +258,17 @@ def keep_classpath(wt, rd):
 
 
 def prune_classpaths(work_dir, keep=KEEP_RUNS):
-    """Delete the kept classpath of every run but the `keep` newest (all PRs); mark their status.json. -> pruned dirs."""
+    """Delete the kept classpath of every run but the `keep` newest (all projects and PRs); mark their status.json.
+
+    -> pruned dirs. Runs live at build-runs/<slug>/<N>/<head>.
+    """
     runs = []
-    base = os.path.join(work_dir, "build-runs")
-    for pr in sorted(os.listdir(base)) if os.path.isdir(base) else []:
-        for head in sorted(os.listdir(os.path.join(base, pr))) if os.path.isdir(os.path.join(base, pr)) else []:
-            rd = os.path.join(base, pr, head)
-            if os.path.isdir(os.path.join(rd, "classpath")):
-                try:
-                    runs.append((os.path.getmtime(os.path.join(rd, "status.json")), rd))
-                except OSError:
-                    runs.append((0, rd))
+    for rd in sorted(glob.glob(os.path.join(work_dir, "build-runs", "*", "*", "*"))):
+        if os.path.isdir(os.path.join(rd, "classpath")):
+            try:
+                runs.append((os.path.getmtime(os.path.join(rd, "status.json")), rd))
+            except OSError:
+                runs.append((0, rd))
     runs.sort(reverse=True)
     out = []
     for _, rd in runs[keep:]:
@@ -286,12 +287,12 @@ def prune_classpaths(work_dir, keep=KEEP_RUNS):
 def not_built(bundle, work_dir, decision):
     st = base_status(bundle, decision)
     st["status"], st["reason"] = "not-built", decision["reason"]
-    return write_status(run_dir(work_dir, bundle["pr"]["number"], bundle["pr"]["head_sha"]), st), st
+    return write_status(run_dir(work_dir, project_mod.of(bundle).slug, bundle["pr"]["number"], bundle["pr"]["head_sha"]), st), st
 
 
-def load_status(work_dir, number, head):
+def load_status(work_dir, slug, number, head):
     try:
-        with open(os.path.join(run_dir(work_dir, number, head), "status.json")) as f:
+        with open(os.path.join(run_dir(work_dir, slug, number, head), "status.json")) as f:
             return json.load(f)
     except (OSError, ValueError):
         return None
@@ -306,7 +307,7 @@ class Build:
         self.select_fn, self.cov_fn, self.home, self.clock = select_fn, cov_fn, home, clock
         self.head, self.mb = self.pr["head_sha"], bundle["git"]["merge_base"]
         self.fetch_clone = bundle["git"]["clone"]
-        self.rd = run_dir(work_dir, self.pr["number"], self.head)
+        self.rd = run_dir(work_dir, project_mod.of(bundle).slug, self.pr["number"], self.head)
         self.wt, self.m2 = os.path.join(self.rd, "buildclone"), os.path.join(self.rd, "m2")
         self.start = clock()
         self.deadline = self.start + cfg["caps"]["wall_seconds"]

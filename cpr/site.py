@@ -14,7 +14,7 @@ import os
 import re
 import shutil
 
-from cpr import VERSION
+from cpr import VERSION, project as project_mod
 from cpr.model import ROLE_NAMES, derive_view
 from cpr.render import tokens_style
 
@@ -72,10 +72,15 @@ def published_heads(site_dir):
     return {n: m["pr"].get("head_sha") for n, m in published_reports(site_dir).items()}
 
 
+def _published_project(model):
+    """The site holds apache/cassandra reports only (sibling projects get their own section in a later change)."""
+    return ((model.get("project") or {}).get("slug") or project_mod.DEFAULT) == project_mod.DEFAULT
+
+
 def merge_report(site_dir, report_path):
     """Apply one local report to the site. Returns (number, action): added, replaced, kept, or skipped."""
     local = read_model(report_path)
-    if not local:
+    if not local or not _published_project(local):
         return None, "skipped"
     number = local["pr"]["number"]
     dest = os.path.join(site_dir, "pr", str(number), "index.html")
@@ -109,7 +114,7 @@ def merge(reports_dir, site_dir):
     Returns (rows, actions) where actions maps PR number to added/replaced/kept.
     """
     actions = {}
-    for path in sorted(glob.glob(os.path.join(reports_dir, "*", "index.html"))):
+    for path in sorted(glob.glob(os.path.join(reports_dir, project_mod.DEFAULT, "*", "index.html"))):
         number, action = merge_report(site_dir, path)
         if number is not None:
             actions[number] = action
@@ -286,6 +291,6 @@ footer {{ font-size: var(--fs-sm); color: var(--ink-3); border-top: 1px solid va
 
 
 def build(reports_dir, out_dir):
-    """Write a site into out_dir from reports/<N>/index.html alone. Returns the rows."""
+    """Write a site into out_dir from reports/cassandra/<N>/index.html alone. Returns the rows."""
     os.makedirs(out_dir, exist_ok=True)
     return merge(reports_dir, out_dir)[0]

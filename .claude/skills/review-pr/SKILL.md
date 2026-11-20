@@ -6,8 +6,9 @@ argument-hint: <PR number>
 
 # /review-pr <N>
 
-Produces `reports/<N>/index.html` with the requirement checks and code review findings. Read-only
-everywhere: nothing is posted to GitHub or JIRA.
+Produces `reports/cassandra/<N>/index.html` with the requirement checks and code review findings. Read-only
+everywhere: nothing is posted to GitHub or JIRA. apache/cassandra PRs only for now: the lens checklists
+and prompts are not set up for sidecar or analytics PRs yet.
 
 ## 1. Prepare
 
@@ -17,7 +18,7 @@ bin/cpr prepare <N>
 
 It ingests the PR, checks the PR head out into a worktree, writes a context file, extracts the
 review checklists from apache/cassandra trunk into a trusted `refdir`, and prints JSON:
-`worktree`, `base` (merge-base sha), `head`, `jira_key`, `context_file`, `lens_dir`, `panel`
+`project`, `repo`, `worktree`, `base` (merge-base sha), `head`, `jira_key`, `context_file`, `lens_dir`, `panel`
 (the lenses to run, from `cpr/config/panel.json`), `checklists` (`sha`, `refdir`, `missing`),
 `tier` (`none`, `small`, `medium`, `large`), and `bundle` (per lens: `status`, `files`,
 `categories`, `focus`, `not_reviewed`, `error`). Stop and report if it exits non-zero.
@@ -27,7 +28,7 @@ PR author's code, so it is gated:
 
 - If `author_is_committer` is true, start `bin/cpr build <N>` **in the background** right away
   (`run_in_background`; it takes about 5 minutes and runs sandboxed) and let it run while the lenses work.
-  It saves `.work/build-runs/<N>/<head>/status.json`; step 4 reads it. Do not start a second build for the
+  It saves `.work/build-runs/cassandra/<N>/<head>/status.json`; step 4 reads it. Do not start a second build for the
   same head.
 - If it is false, do not build. The report will say "Not built for this head". Tell the owner that they can
   approve this exact head with `bin/cpr build <N> --approve` and then re-render (step 4).
@@ -97,4 +98,4 @@ bin/cpr review <N> --lenses <lens_dir>
 This merges the lens outputs under the panel rules in `cpr/review.py` and writes the report. Tell
 the user the report path, the recommendation line, the per-lens status line it prints, and the build status
 (or that the PR was not built and how to approve it). Offer
-`open reports/<N>/index.html`.
+`open reports/cassandra/<N>/index.html`.

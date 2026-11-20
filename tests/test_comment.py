@@ -155,7 +155,7 @@ class Post(Base):
         self.assertEqual(len(w), 1)
         self.assertEqual(w[0][:3], ["api", "-X", "POST"])
         self.assertEqual(res["comment_id"], 99)
-        with open(comment.comment_json_path(self.work.name, 5201)) as f:
+        with open(comment.comment_json_path(self.work.name, "cassandra", 5201)) as f:
             rec = json.load(f)
         self.assertEqual((rec["comment_id"], rec["head"]), (99, SHA))
         self.assertIn("posted_at", rec)

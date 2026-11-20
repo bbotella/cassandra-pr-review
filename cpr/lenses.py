@@ -122,32 +122,35 @@ def match_categories(signals, diff_text, extra=None, min_signals=2):
 
 # ---- tiers --------------------------------------------------------------------------------------
 
-def is_code(path):
-    return not paths.is_doc(path) and not paths.is_generated(path) and (
-        paths.is_prod(path) or path.endswith(CODE_EXTS))
+def is_code(path, classify=paths):
+    return not classify.is_doc(path) and not classify.is_generated(path) and (
+        classify.is_prod(path) or path.endswith(CODE_EXTS))
 
 
 def _changed_code(bundle):
-    return [f for f in bundle.get("files", []) if paths.counted(f) and is_code(f["path"])]
+    pc = paths.of(bundle)
+    return [f for f in bundle.get("files", []) if pc.counted(f) and is_code(f["path"], pc)]
 
 
 def tier_of(bundle, cfg):
     """(tier, non-test changed lines). Tier is none for a PR that changes no code or test files."""
-    files = [f for f in bundle.get("files", []) if paths.counted(f)]
-    if not any(is_code(f["path"]) for f in files):
+    pc = paths.of(bundle)
+    files = [f for f in bundle.get("files", []) if pc.counted(f)]
+    if not any(is_code(f["path"], pc) for f in files):
         return "none", 0
-    lines = sum(f["additions"] + f["deletions"] for f in files if is_code(f["path"]) and not paths.is_test(f["path"]))
+    lines = sum(f["additions"] + f["deletions"] for f in files if is_code(f["path"], pc) and not pc.is_test(f["path"]))
     t = cfg["tiers"]
     return ("small" if lines < t["small_under"] else "large" if lines > t["large_over"] else "medium"), lines
 
 
 def diff_text(bundle):
     """Added and removed lines of non-test code files, joined."""
+    pc = paths.of(bundle)
     out, keep = [], False
     for line in (bundle.get("diff") or "").split("\n"):
         if line.startswith("diff --git "):
             m = re.match(r"diff --git a/.* b/(.*)$", line)
-            keep = bool(m) and is_code(m.group(1)) and not paths.is_test(m.group(1))
+            keep = bool(m) and is_code(m.group(1), pc) and not pc.is_test(m.group(1))
         elif keep and line[:1] in "+-" and not line.startswith(("+++", "---")):
             out.append(line[1:])
     return "\n".join(out)
@@ -158,7 +161,7 @@ def rank_files(bundle, cfg):
     with open(TRIAGE) as f:
         conc_paths = json.load(f)["concurrency_paths"]
     w = cfg["risk"]
-    prod = [f for f in _changed_code(bundle) if not paths.is_test(f["path"])]
+    prod = [f for f in _changed_code(bundle) if not paths.of(bundle).is_test(f["path"])]
     surfaces = {p for ps in touched_surfaces([f["path"] for f in prod]).values() for p in ps}
     ranked = []
     for f in prod:

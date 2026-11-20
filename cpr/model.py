@@ -3,7 +3,7 @@
 import re
 import time
 
-from cpr import VERSION, buildresult, labplan, paths
+from cpr import VERSION, buildresult, labplan, paths, project as project_mod
 from cpr.checks import STATUSES
 from cpr.checks.compat import touched_surfaces
 from cpr.merge import issues_of
@@ -50,18 +50,18 @@ HUMAN_ONLY = [
 _RANK = {"fail": 0, "unknown": 1, "warn": 2, "pass": 3}
 
 
-def _file_kind(path):
-    if paths.is_test_resource(path):
+def _file_kind(path, classify=paths):
+    if classify.is_test_resource(path):
         return "test-resource"
-    if paths.is_test(path):
+    if classify.is_test(path):
         return "test"
-    if paths.is_generated(path):
+    if classify.is_generated(path):
         return "generated"
-    if paths.is_prod(path):
+    if classify.is_prod(path):
         return "production"
-    if paths.is_doc(path):
+    if classify.is_doc(path):
         return "doc"
-    if paths.is_build(path):
+    if classify.is_build(path):
         return "build"
     return "other"
 
@@ -232,6 +232,7 @@ def _panel_summary():
 def build(bundle, checks, triage, docs, diffview, review=None, context=None):
     """Assemble the report model. `review` is None until review lenses exist."""
     pr = bundle["pr"]
+    proj = project_mod.of(bundle)
     ticket = (bundle.get("jira") or {}).get("ticket")
     rec = recommend(pr, checks, review)
     branches, unmapped = _branch_rows(bundle)
@@ -279,6 +280,7 @@ def build(bundle, checks, triage, docs, diffview, review=None, context=None):
         "schema": MODEL_SCHEMA,
         "generated_at": time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime()),
         "tool": {"name": "cassandra-pr-review", "version": VERSION},
+        "project": proj.summary(),
         "pr": {k: pr.get(k) for k in ("number", "url", "title", "body", "author", "author_association", "base",
                                       "head_ref", "head_repo", "head_sha", "draft", "state", "labels",
                                       "created_at", "updated_at", "additions", "deletions", "changed_files")},
@@ -301,7 +303,7 @@ def build(bundle, checks, triage, docs, diffview, review=None, context=None):
                      "login": c["login"], "trailers": c["trailers"],
                      "url": f"{pr['url']}/commits/{c['sha']}" if pr.get("url") else None} for c in bundle["commits"]],
         "files": [{**{k: f.get(k) for k in ("path", "previous_path", "status", "additions", "deletions", "binary")},
-                   "kind": _file_kind(f["path"]), "suite": paths.test_suite(f["path"])}
+                   "kind": _file_kind(f["path"], proj.paths), "suite": proj.paths.test_suite(f["path"])}
                   for f in bundle["files"]],
         "compat_surfaces": touched_surfaces([f["path"] for f in bundle["files"]]),
         "complexity": complexity_table(bundle),
@@ -348,6 +350,10 @@ def validate(model):
     need(isinstance(pr.get("number"), int), "pr.number")
     need(isinstance(pr.get("title"), str), "pr.title")
     need(isinstance(pr.get("head_sha"), str) and len(pr["head_sha"]) == 40, "pr.head_sha")
+    proj = model.get("project")  # optional: models from before project profiles have none
+    need(proj is None or (isinstance(proj, dict) and isinstance(proj.get("slug"), str)
+                          and isinstance(proj.get("repo"), str) and isinstance(proj.get("name"), str)
+                          and isinstance(proj.get("suite_labels"), dict)), "project")
     for i, c in enumerate(model.get("checks", [])):
         need(c.get("status") in STATUSES, f"checks[{i}].status")
         need(isinstance(c.get("id"), str), f"checks[{i}].id")
