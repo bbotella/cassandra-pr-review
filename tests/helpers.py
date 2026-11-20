@@ -119,7 +119,10 @@ def github_ci(fixture, head):
     from unittest import mock
     from cpr.ingest import gh_checks
     d = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures", "ci")
-    pages = {kind: [json.load(open(os.path.join(d, f"gh-{kind}-{fixture}.json")))] for kind in ("check-runs", "workflow-runs")}
+    pages = {}
+    for kind in ("check-runs", "workflow-runs"):
+        with open(os.path.join(d, f"gh-{kind}-{fixture}.json")) as f:
+            pages[kind] = [json.load(f)]
     for w in pages["workflow-runs"][0]["workflow_runs"]:
         w["head_sha"] = head  # recorded for the real head; the synthetic bundle has its own
     with mock.patch.object(gh_checks, "gh_json",

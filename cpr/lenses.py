@@ -1,7 +1,9 @@
 """Trusted lens checklists: load them from apache/cassandra trunk, pick a tier, plan each lens's bundle.
 
 Checklists are read only with `git show <sha>:<path>` for allow-listed paths, into a directory outside
-the PR worktree. Nothing is ever read from the PR head, the PR worktree, or the base branch.
+the PR worktree. Nothing is ever read from the PR head, the PR worktree, or the base branch. The checklists
+always come from apache/cassandra, whichever project the PR is in; a subproject's own guides
+(`lenses.guides` in its profile) come from that project's trunk, the same way, into `<refdir>/<slug>/`.
 """
 
 import json
@@ -10,12 +12,14 @@ import re
 import shutil
 import subprocess
 
-from cpr import paths, project as project_mod
+from cpr import layout, paths, project as project_mod
+from cpr.ingest import clone as clone_mod
 from cpr.checks.compat import touched_surfaces
 from cpr.ingest.clone import CloneError, _git
 
 CONFIG = os.path.join(os.path.dirname(__file__), "config", "lenses.json")
 TRIAGE = os.path.join(os.path.dirname(__file__), "config", "triage.json")
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_REF = "origin/trunk"
 CODE_EXTS = (".java", ".py", ".g", ".jj", ".kt", ".sh")
 
@@ -48,27 +52,50 @@ def _read(clone, sha, path, cap):
         return None, "not valid UTF-8"
 
 
-def extract(clone, sha, refdir, cfg):
-    """Write each allow-listed file at `sha` under `refdir` and a manifest.json. Returns the manifest."""
-    shutil.rmtree(refdir, ignore_errors=True)
-    os.makedirs(refdir)
+def _write(clone, sha, root, paths, cap):
+    """{path: {ok, error}} after writing each of `paths` at `sha` under `root`."""
     files = {}
-    for path in cfg["allow"]:
+    for path in paths:
         if path.startswith("/") or ".." in path.split("/"):
             files[path] = {"ok": False, "error": "unsafe path"}
             continue
-        text, err = _read(clone, sha, path, cfg["size_cap_bytes"])
+        text, err = _read(clone, sha, path, cap)
         if err is None:
-            dest = os.path.join(refdir, path)
+            dest = os.path.join(root, path)
             os.makedirs(os.path.dirname(dest), exist_ok=True)
             with open(dest, "w", encoding="utf-8") as f:
                 f.write(text)
         files[path] = {"ok": err is None, "error": err}
+    return files
+
+
+def extract(clone, sha, refdir, cfg):
+    """Write each allow-listed file at `sha` under `refdir` and a manifest.json. Returns the manifest."""
+    shutil.rmtree(refdir, ignore_errors=True)
+    os.makedirs(refdir)
+    files = _write(clone, sha, refdir, cfg["allow"], cfg["size_cap_bytes"])
     manifest = {"sha": sha, "ref": cfg.get("lens_ref") or DEFAULT_REF, "refdir": refdir, "files": files,
                 "missing": sorted(p for p, v in files.items() if not v["ok"])}
     with open(os.path.join(refdir, "manifest.json"), "w") as f:
         json.dump(manifest, f, indent=1)
     return manifest
+
+
+def extract_guides(clone, sha, refdir, proj, cfg):
+    """Write the project's own guides at `sha` (its trunk) under `<refdir>/<slug>/`; record them in the manifest.
+
+    Returns {sha, root, files, missing}. Call after `extract`, which empties the refdir.
+    """
+    root = os.path.join(refdir, proj.slug)
+    files = _write(clone, sha, root, sorted(proj.lens_guides), cfg["size_cap_bytes"])
+    guides = {"sha": sha, "root": root, "files": files, "missing": sorted(p for p, v in files.items() if not v["ok"])}
+    path = os.path.join(refdir, "manifest.json")
+    with open(path) as f:
+        manifest = json.load(f)
+    manifest["guides"] = guides
+    with open(path, "w") as f:
+        json.dump(manifest, f, indent=1)
+    return guides
 
 
 # ---- INDEX diff signals -------------------------------------------------------------------------
@@ -190,9 +217,15 @@ def _read_index(manifest, cfg):
         return f.read()
 
 
-def plan(bundle, manifest, cfg):
-    """{tier, lines, lenses: {name: {status, files, categories, focus, not_reviewed, missing, error}}}."""
+def plan(bundle, manifest, cfg, proj=None):
+    """{tier, lines, lenses: {name: {status, files, categories, focus, not_reviewed, missing, error}}}.
+
+    The project's `lenses.drop` paths leave every bundle, and each guide in `manifest["guides"]` joins the
+    bundles of the lenses its profile names. A guide missing at the project's trunk is a note, not a missing lens.
+    """
+    proj = proj or project_mod.of(bundle)
     tier, lines = tier_of(bundle, cfg)
+    guides = manifest.get("guides") or {"files": {}, "root": None}
     ok = lambda p: manifest["files"].get(p, {}).get("ok", False)  # noqa: E731
     chosen, notes = {}, []
     if tier == "medium":
@@ -205,6 +238,8 @@ def plan(bundle, manifest, cfg):
             chosen.setdefault(owner[cat], []).append(cat)
         if index is None:
             notes.append(f"{cfg['index']} is unavailable: targeted categories could not be chosen")
+    notes += [f"{proj.name} guide {p} is unavailable at its trunk: {v['error']}"
+              for p, v in sorted(guides["files"].items()) if not v["ok"]]
     ranked = rank_files(bundle, cfg) if tier == "large" else []
     top = ranked[:cfg["focus_files"]]
     rest = [r["path"] for r in ranked[cfg["focus_files"]:]]
@@ -221,12 +256,63 @@ def plan(bundle, manifest, cfg):
             want += [l["categories"][c] for c in cats]
             if l["categories"] and not ok(cfg["index"]):
                 want.append(cfg["index"])
+        want = [p for p in want if p not in proj.lens_drop]
         entry["missing"] = [p for p in want if not ok(p)]
         if entry["missing"]:
             entry["status"] = "missing"
             entry["error"] = "checklist missing at trunk: " + ", ".join(entry["missing"])
             continue
-        entry.update(status="ok", files=[os.path.join(manifest["refdir"], p) for p in want], categories=cats)
+        files = [os.path.join(manifest["refdir"], p) for p in want]
+        files += [os.path.join(guides["root"], p) for p, v in sorted(guides["files"].items())
+                  if v["ok"] and name in proj.lens_guides.get(p, ())]
+        entry.update(status="ok", files=files, categories=cats)
         if tier == "large":
             entry.update(focus=top, not_reviewed=rest)
     return {"tier": tier, "lines": lines, "notes": notes, "lenses": lenses}
+
+
+# ---- prepare ------------------------------------------------------------------------------------
+
+def inputs(proj):
+    """The per-project lens inputs of the prepare JSON: the project name and the standards and testing docs."""
+    return {"project_name": proj.name, "standards": os.path.join(ROOT, proj.lens_standards),
+            "testing_doc": os.path.join(ROOT, proj.lens_testing_doc)}
+
+
+def checklist_clone(work_dir, target_clone, proj, offline=False):
+    """The apache/cassandra clone the checklists come from: the PR's own clone for a Cassandra PR."""
+    if proj.slug == project_mod.DEFAULT:
+        return target_clone
+    path = layout.clone_dir(work_dir, project_mod.load(project_mod.DEFAULT))
+    if offline and not os.path.isdir(os.path.join(path, ".git")):
+        raise CloneError(f"no apache/cassandra clone at {path} for the checklists; run once without --offline")
+    clone_mod.ensure(path)
+    return path
+
+
+def prepare(proj, bundle, d, checklists_from, target_clone, offline=False, log=lambda m: None):
+    """Extract the checklists and the project's guides into `<d>/refdir`, plan every lens, write lens-plan.json.
+
+    `checklists_from` is the apache/cassandra clone and `target_clone` the PR project's clone; each one's
+    origin/trunk is fetched first unless `offline`.
+    """
+    cfg = load_config()
+    if not offline:
+        clone_mod.fetch_trunk(checklists_from)
+    sha = resolve(checklists_from, cfg.get("lens_ref"))
+    refdir = os.path.join(d, "refdir")
+    manifest = extract(checklists_from, sha, refdir, cfg)
+    log(f"checklists: apache/cassandra trunk @ {sha[:12]} ({len(manifest['missing'])} missing)")
+    checklists = {"sha": sha, "refdir": refdir, "missing": manifest["missing"]}
+    if proj.lens_guides:
+        if not offline:
+            clone_mod.fetch_trunk(target_clone)
+        gsha = resolve(target_clone)
+        manifest["guides"] = extract_guides(target_clone, gsha, refdir, proj, cfg)
+        checklists["guides"] = {"repo": proj.repo, "sha": gsha, "missing": manifest["guides"]["missing"]}
+        log(f"guides: {proj.repo} trunk @ {gsha[:12]} ({len(manifest['guides']['missing'])} missing)")
+    result = plan(bundle, manifest, cfg, proj)
+    result["checklists"] = checklists
+    with open(os.path.join(d, "lens-plan.json"), "w") as f:
+        json.dump(result, f, indent=1)
+    return result

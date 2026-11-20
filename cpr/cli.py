@@ -108,21 +108,12 @@ def write_context(bundle, path):
         f.write("\n".join(lines) + "\n")
 
 
-def prepare_lenses(bundle, d, offline, log):
-    """Fetch trunk, extract the trusted checklists into <sha_dir>/refdir, plan each lens's bundle by tier."""
-    cfg = lenses_mod.load_config()
-    repo = bundle["git"]["clone"]
-    if not offline:
-        clone.fetch_trunk(repo)
-    sha = lenses_mod.resolve(repo, cfg.get("lens_ref"))
-    refdir = os.path.join(d, "refdir")
-    manifest = lenses_mod.extract(repo, sha, refdir, cfg)
-    log(f"checklists: apache/cassandra trunk @ {sha[:12]} ({len(manifest['missing'])} missing)")
-    plan = lenses_mod.plan(bundle, manifest, cfg)
-    plan["checklists"] = {"sha": sha, "refdir": refdir, "missing": manifest["missing"]}
-    with open(os.path.join(d, "lens-plan.json"), "w") as f:
-        json.dump(plan, f, indent=1)
-    return plan
+def prepare_lenses(bundle, d, offline, log, work_dir=None):
+    """Fetch trunk, extract the trusted checklists (and the project's guides) into <sha_dir>/refdir, plan each lens."""
+    proj = project_mod.of(bundle)
+    target = bundle["git"]["clone"]
+    source = lenses_mod.checklist_clone(work_dir or os.path.join(ROOT, ".work"), target, proj, offline)
+    return lenses_mod.prepare(proj, bundle, d, source, target, offline, log)
 
 
 def cmd_prepare(args):
@@ -150,7 +141,7 @@ def cmd_prepare(args):
     context = os.path.join(d, "context.md")
     write_context(bundle, context)
     try:
-        plan = prepare_lenses(bundle, d, args.offline, log)
+        plan = prepare_lenses(bundle, d, args.offline, log, work_dir)
     except CloneError as e:
         print(f"error: {e}", file=sys.stderr)
         return 1
@@ -158,6 +149,7 @@ def cmd_prepare(args):
         "pr": number,
         "project": proj.slug,
         "repo": proj.repo,
+        **lenses_mod.inputs(proj),
         "title": bundle["pr"]["title"],
         "jira_key": bundle["jira_key"]["key"],
         "worktree": wt,

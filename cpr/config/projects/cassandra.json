@@ -80,5 +80,11 @@
   "Tests are built and run only for committers' PRs (or a PR the owner approved) and only a selection of unit tests; otherwise CI evidence comes only from summaries attached to JIRA.",
   "CI failures are counted, not compared against known flaky tests (Butler) yet.",
   "Code review lenses read the diff; they do not build or run tests."
- ]
+ ],
+ "lenses": {
+  "standards": "docs/research/cassandra-standards.md",
+  "testing_doc": "docs/report/testing.md",
+  "guides": {},
+  "drop": []
+ }
 }

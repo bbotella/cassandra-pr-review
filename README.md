@@ -19,9 +19,11 @@ reports apply each project's own rules: the Gradle module layout, CASSSIDECAR an
 CI from the PR head's GitHub Actions checks (a first-time contributor's runs waiting for approval read
 "awaiting approval", not failed), checkstyle with the project's own config and version (sidecar 7.8.1,
 analytics 9.3), and the project's compatibility surfaces. Checks that are not part of their process
-(yaml pairing, nodetool, the upgrade-test CI profile, the lab plan, ...) read not-applicable. Code review
-lenses and builds are not set up for them yet, and the published site and `cpr comment` cover
-apache/cassandra only. Each project keeps its own data under
+(yaml pairing, nodetool, the upgrade-test CI profile, the lab plan, ...) read not-applicable.
+`/review-pr sidecar#397` runs the same six code review lenses with the Cassandra checklists, the
+project's own contributor guides from its trunk, and its standards file
+(`docs/research/{sidecar,analytics}-standards.md`). Builds are not set up for them yet, and the published
+site and `cpr comment` cover apache/cassandra only. Each project keeps its own data under
 `.work/pr/<project>/`, `.work/build-runs/<project>/` and `reports/<project>/`; data from before projects
 existed is moved there on the first run.
 
@@ -103,7 +105,7 @@ refreshes a checkout of `gh-pages` the same way the workflow does.
 | Static analysis | the project's checkstyle, PMD cognitive complexity, the full PMD rule catalog, and CPD duplicate code on changed Java files, split into introduced by the PR and already there |
 | Compatibility | both yaml files updated together, system properties, nodetool help fixtures, touched compatibility surfaces |
 | Build & coverage | the PR head compiles, selected unit tests pass, and which added `src/java` lines those tests ran (JaCoCo) |
-| Code review | six AI review lenses (standards and ticket, logic and boundaries, concurrency and lifecycle, persistence and compatibility, completeness, test regime), each applying checklists from apache/cassandra trunk |
+| Code review | six AI review lenses (standards and ticket, logic and boundaries, concurrency and lifecycle, persistence and compatibility, completeness, test regime), each applying checklists from apache/cassandra trunk (plus a subproject's own guides and standards) |
 | Reviews & votes | two committer +1s, matched against the public ASF roster |
 | Triage | informational: how hard the PR is to review (easy, moderate, hard) |
 | Context | informational: tickets that last changed this code (`git blame`), linked issues, and the people most experienced with each file |

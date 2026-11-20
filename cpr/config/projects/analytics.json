@@ -173,5 +173,13 @@
  "ci_branches": [
   "trunk"
  ],
- "build_tool": null
+ "build_tool": null,
+ "lenses": {
+  "standards": "docs/research/analytics-standards.md",
+  "testing_doc": "docs/report/subprojects/testing.md",
+  "guides": {
+   "DEV-README.md": ["cassandra-standards", "cass-persistence-compat", "cass-completeness-symmetry", "cass-test-regime"]
+  },
+  "drop": [".claude/skills/cassandra-injvm-dtest/SKILL.md"]
+ }
 }

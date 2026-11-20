@@ -51,6 +51,16 @@
     "Integration (src/integrationTest)"
    ],
    [
+    "(^|/)src/test/integration/",
+    "integration",
+    "Integration (src/test/integration)"
+   ],
+   [
+    "(^|/)src/test/containerTest/",
+    "container",
+    "Container (src/test/containerTest)"
+   ],
+   [
     "(^|/)src/containerTest/",
     "container",
     "Container (src/containerTest)"
@@ -183,5 +193,16 @@
  "ci_branches": [
   "trunk"
  ],
- "build_tool": null
+ "build_tool": null,
+ "lenses": {
+  "standards": "docs/research/sidecar-standards.md",
+  "testing_doc": "docs/report/subprojects/testing.md",
+  "guides": {
+   "CONTRIBUTING.md": ["cassandra-standards", "cass-concurrency-lifecycle", "cass-persistence-compat", "cass-completeness-symmetry"],
+   "TESTING.md": ["cassandra-standards", "cass-test-regime"],
+   "OPENAPI.md": ["cass-persistence-compat", "cass-completeness-symmetry"],
+   "docs/vertx-threading-model.md": ["cass-concurrency-lifecycle"]
+  },
+  "drop": [".claude/skills/cassandra-injvm-dtest/SKILL.md"]
+ }
 }

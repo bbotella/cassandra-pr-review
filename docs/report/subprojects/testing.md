@@ -15,8 +15,8 @@ Both projects are Gradle multi-module builds; each module keeps its tests in its
 | Suite | Where | Run with | Use it for |
 |---|---|---|---|
 | Unit | `src/test/` in each module | `./gradlew test`, `./gradlew :server:test` | Components in isolation, no external dependencies. |
-| Integration | `src/integrationTest/` and the `integration-tests` module | `./gradlew integrationTest` (`integrationTestLightWeight`, `integrationTestHeavyWeight`) | Behaviour against running in-JVM Cassandra instances. Multi-node and complex tests are tagged `@Tag("heavy")`. |
-| Container | `src/containerTest/` | `./gradlew containerTest`, or `./gradlew check` for every suite | Only tests that need testcontainers, such as the S3 mock for restore. |
+| Integration | `src/integrationTest/`, `server/src/test/integration/` and the `integration-tests` module | `./gradlew integrationTest` (`integrationTestLightWeight`, `integrationTestHeavyWeight`) | Behaviour against running in-JVM Cassandra instances. Multi-node and complex tests are tagged `@Tag("heavy")`. |
+| Container | `server/src/test/containerTest/` (and any `src/containerTest/`) | `./gradlew containerTest`, or `./gradlew check` for every suite | Only tests that need testcontainers, such as the S3 mock for restore. |
 | Test fixtures | `src/testFixtures/` | | Shared test utilities. |
 
 Integration tests need the in-JVM dtest jars built from Cassandra first (`./scripts/build-dtest-jars.sh`) and network aliases for multi-node tests; container tests need Docker. Source: [Sidecar TESTING.md](https://github.com/apache/cassandra-sidecar/blob/trunk/TESTING.md).
@@ -54,7 +54,7 @@ Integration tests need the dtest jars and Sidecar libraries built first (`./scri
 The check sorts changed files by path:
 
 - **Production code** is any path under a module's `src/main/` that is not a test path.
-- **Test code**, Sidecar: `src/test/`, `src/integrationTest/`, `src/containerTest/`, `src/testFixtures/`, and the `integration-tests`, `integration-framework` and `test-common` modules. Analytics: `src/test*/`, `src/testFixtures*/`, and the `cassandra-analytics-integration-tests` and `cassandra-analytics-integration-framework` modules. Each test file is assigned the suite from the tables above (`other` for Sidecar's `integration-framework` and `test-common`).
+- **Test code**, Sidecar: `src/test/` (its `integration/` and `containerTest/` subdirectories are their own suites), `src/integrationTest/`, `src/containerTest/`, `src/testFixtures/`, and the `integration-tests`, `integration-framework` and `test-common` modules. Analytics: `src/test*/`, `src/testFixtures*/`, and the `cassandra-analytics-integration-tests` and `cassandra-analytics-integration-framework` modules. Each test file is assigned the suite from the tables above (`other` for Sidecar's `integration-framework` and `test-common`).
 
 Then:
 

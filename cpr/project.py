@@ -37,6 +37,11 @@ class Project:
         self.static = data.get("static", {})
         self.triage = data.get("triage", {})
         self.not_checked = list(data.get("not_checked", ()))
+        lens = data.get("lenses", {})
+        self.lens_standards = lens.get("standards", "docs/research/cassandra-standards.md")
+        self.lens_testing_doc = lens.get("testing_doc", "docs/report/testing.md")
+        self.lens_guides = {p: tuple(names) for p, names in lens.get("guides", {}).items()}
+        self.lens_drop = frozenset(lens.get("drop", ()))
 
     @property
     def key_n(self):
