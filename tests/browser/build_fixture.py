@@ -155,7 +155,7 @@ def sidecar_model():
 
 
 def build_site(out_dir, model):
-    """An index over five different reports: contributor, draft, reviewers (siblings), unknown and ready-ish mixes."""
+    """An index over seven Cassandra reports (contributor, draft, reviewers, unknown and ready-ish mixes) and one Sidecar report."""
     from cpr import site
     reports = os.path.join(out_dir, "site-reports")
     for name in ("4967-huge.json.gz", "5201-backport-set.json.gz", "5212-no-jira.json.gz", "5228-stale-ci.json.gz", "5238-draft.json.gz"):
@@ -170,6 +170,8 @@ def build_site(out_dir, model):
         m["recommendation"] = {**m["recommendation"], "verdict": verdict, "reasons": []}
         m.pop("view", None)
         render.write(m, os.path.join(reports, "cassandra", str(number), "index.html"))
+    side = sidecar_model()
+    render.write(side, os.path.join(reports, "sidecar", str(side["pr"]["number"]), "index.html"))
     rows = site.build(reports, os.path.join(out_dir, "site"))
     return os.path.join(out_dir, "site", "index.html"), rows
 
@@ -198,7 +200,9 @@ def main(out_dir):
                       "about": os.path.join(out_dir, "about.html"), "unreviewed": os.path.join(out_dir, "unreviewed.html"),
                       "huge": os.path.join(out_dir, "huge.html"), "sidecar": os.path.join(out_dir, "sidecar.html"),
                       "index": index,
-                      "index_groups": {r["group"]: sum(1 for x in rows if x["group"] == r["group"]) for r in rows},
+                      "index_groups": {p: {r["group"]: sum(1 for x in rows if (x["project"], x["group"]) == (p, r["group"]))
+                                           for r in rows if r["project"] == p}
+                                       for p in sorted({r["project"] for r in rows})},
                       "hostile_title": HOSTILE_TITLE, "hostile_evidence": HOSTILE_EVIDENCE}))
 
 

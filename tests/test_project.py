@@ -251,11 +251,10 @@ class Cli(unittest.TestCase):
             self.assertEqual(rc, 1)
             self.assertIn("--project is analytics", err.getvalue())
 
-    def test_comment_refuses_a_project_with_no_published_site(self):
+    def test_comment_links_to_the_projects_page(self):
         from cpr import comment
-        m = {"project": {"slug": "sidecar"}, "pr": {"number": 397}, "recommendation": {"reasons": []}}
-        with self.assertRaises(comment.CommentError):
-            comment.plan(397, m)
+        with mock.patch.dict(os.environ, {"CPR_PAGES_BASE": "https://example.org/site"}):
+            self.assertEqual(comment.pages_url(project.load("sidecar"), 397), "https://example.org/site/sidecar/pr/397/")
 
 
 if __name__ == "__main__":

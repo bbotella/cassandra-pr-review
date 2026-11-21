@@ -218,22 +218,35 @@ def cmd_poll(args):
     if args.run and not args.site:
         print("error: --run needs --site DIR (a checkout of the gh-pages branch)", file=sys.stderr)
         return 2
-    try:
-        open_prs = poll.fetch_open()
-    except NetError as e:
-        print(f"error: {e}", file=sys.stderr)
+    projects = [project_mod.lookup(args.project)] if args.project else \
+        [project_mod.load(project_mod.DEFAULT)] + [project_mod.load(s) for s in project_mod.slugs() if s != project_mod.DEFAULT]
+    if args.site:
+        if args.run:
+            site.migrate(args.site, log)
+        heads = site.published_heads(args.site)
+    else:
+        heads = poll.heads_from_git(ROOT)
+    picked, errors = [], 0
+    for proj in projects:
+        try:
+            open_prs = poll.fetch_open(repo=proj.repo)
+        except NetError as e:
+            print(f"error: {proj.name}: {e}", file=sys.stderr)
+            errors += 1
+            continue
+        mine, skipped = poll.select(open_prs, poll.heads_for(heads, proj.slug), limit=args.limit)
+        print(poll.format_picks(mine, skipped, proj if len(projects) > 1 else None))
+        picked += [{**p, "project": proj.slug} for p in mine]
+    if errors == len(projects):
         return 1
-    heads = site.published_heads(args.site) if args.site else poll.heads_from_git(ROOT)
-    picked, skipped = poll.select(open_prs, heads, limit=args.limit)
-    print(poll.format_picks(picked, skipped))
     if not args.run:
         return 0
 
-    def review(number, out):
-        return main(["review", str(number), "--project", "cassandra", "--out", out, "--work-dir", work_dir, "--quiet"])
+    def review(slug, number, out):
+        return main(["review", str(number), "--project", slug, "--out", out, "--work-dir", work_dir, "--quiet"])
 
     outcomes = poll.refresh(picked, args.site, review, log=log)
-    failed = [n for n, o in outcomes.items() if o.startswith("failed")]
+    failed = [k for k, o in outcomes.items() if o.startswith("failed")]
     print(f"refreshed {len(outcomes) - len(failed)} of {len(outcomes)}; index rebuilt in {args.site}")
     return 0
 
@@ -388,7 +401,8 @@ def main(argv=None):
     pl = sub.add_parser("poll", help="list open PRs whose published report is missing or stale; --run refreshes them")
     pl.add_argument("--run", action="store_true", help="run the cheap review (no lenses, no build) and update --site")
     pl.add_argument("--site", help="gh-pages checkout holding the published site (default: read origin/gh-pages)")
-    pl.add_argument("--limit", type=int, default=25, help="most PRs to refresh in one run")
+    pl.add_argument("--limit", type=int, default=25, help="most PRs to refresh in one run, per project")
+    pl.add_argument("--project", help=f"poll only this project: {', '.join(project_mod.slugs())} (default: all)")
     pl.add_argument("--work-dir", default=default_work)
     pl.set_defaults(func=cmd_poll)
 

@@ -52,7 +52,7 @@ def origin_url():
 
 
 def pages_base():
-    """Where bin/publish-pages publishes: $CPR_PAGES_BASE, else the GitHub Pages site of this checkout's origin."""
+    """Root of the site bin/publish-pages publishes: $CPR_PAGES_BASE, else the GitHub Pages site of this checkout's origin."""
     env = os.environ.get("CPR_PAGES_BASE", "").strip()
     if env:
         return env.rstrip("/")
@@ -62,11 +62,12 @@ def pages_base():
         raise CommentError(f"cannot tell where reports are published from origin {url or '(none)'}: set CPR_PAGES_BASE")
     owner, repo = m.group(1).lower(), m.group(2)
     host = f"{owner}.github.io"
-    return f"https://{host}/pr" if repo.lower() == host else f"https://{host}/{repo}/pr"
+    return f"https://{host}" if repo.lower() == host else f"https://{host}/{repo}"
 
 
-def pages_url(number):
-    return f"{pages_base()}/{number}/"
+def pages_url(proj, number):
+    """The published report of one PR: <site>/<project>/pr/<N>/."""
+    return f"{pages_base()}/{proj.slug}/pr/{number}/"
 
 
 def marker(number, head=None):
@@ -83,7 +84,7 @@ def _clip(text, n):
 def build_body(model, url=None):
     pr, rec = model["pr"], model["recommendation"]
     number, head = pr["number"], pr["head_sha"]
-    url = url or pages_url(number)
+    url = url or pages_url(model_project(model), number)
     review = model.get("review") or {}
     if review.get("status") == "ran":
         n = review.get("must_fix")
@@ -166,8 +167,6 @@ def _norm(s):
 def plan(number, model):
     """Read-only: build the body, look at GitHub and Pages, return what would happen and what blocks it."""
     proj = model_project(model)
-    if proj.slug != project_mod.DEFAULT:
-        raise CommentError(f"the published site has no {proj.name} reports yet, so there is nothing to link to")
     repo = proj.repo
     body = build_body(model)
     head = model["pr"]["head_sha"]
@@ -180,7 +179,7 @@ def plan(number, model):
         problems.append(f"local report is for head {head[:9]} but the PR is at {current[:9]}: re-run cpr review")
     live_head, page_error = None, None
     try:
-        m = site._MODEL_RE.search(fetch_page(pages_url(number)))
+        m = site._MODEL_RE.search(fetch_page(pages_url(proj, number)))
         live_head = json.loads(m.group(1))["pr"]["head_sha"] if m else None
     except net.NetError as e:
         if e.status != 404:

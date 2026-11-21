@@ -22,8 +22,8 @@ analytics 9.3), and the project's compatibility surfaces. Checks that are not pa
 (yaml pairing, nodetool, the upgrade-test CI profile, the lab plan, ...) read not-applicable.
 `/review-pr sidecar#397` runs the same six code review lenses with the Cassandra checklists, the
 project's own contributor guides from its trunk, and its standards file
-(`docs/research/{sidecar,analytics}-standards.md`). Builds are not set up for them yet, and the published
-site and `cpr comment` cover apache/cassandra only. Each project keeps its own data under
+(`docs/research/{sidecar,analytics}-standards.md`). Builds are not set up for them yet. The published site,
+polling and `cpr comment` cover all three projects. Each project keeps its own data under
 `.work/pr/<project>/`, `.work/build-runs/<project>/` and `reports/<project>/`; data from before projects
 existed is moved there on the first run.
 
@@ -58,14 +58,17 @@ build, and for a non-committer a new approval.
 ## Published reports
 
 Reports are published at <https://pmcfadin.github.io/cassandra-pr-review/>, with an index of every
-reviewed PR. To publish after reviewing:
+reviewed PR grouped by project. Each report is at `<project>/pr/<N>/` (`cassandra/pr/5201/`,
+`sidecar/pr/397/`, `analytics/pr/262/`); the older `pr/<N>/` links of Cassandra reports redirect to
+`cassandra/pr/<N>/`. To publish after reviewing:
 
 ```
-bin/publish-pages    # merges reports/ into the published site and pushes the gh-pages branch
+bin/publish-pages    # merges reports/<project>/ into the published site and pushes the gh-pages branch
 ```
 
 `bin/publish-pages` starts from the current `gh-pages` contents, so it never removes reports it does
-not have locally. For a PR in both places, a local report replaces the published one when the head
+not have locally. On a site from before projects existed it first moves `pr/<N>/` to `cassandra/pr/<N>/`
+and leaves a redirect in its place. For a PR in both places, a local report replaces the published one when the head
 differs, or when the head is the same and the local report is at least as rich (it has code review or
 build results, or the published one has neither). `main` never contains reports; the `gh-pages` branch
 holds only the generated site. It refuses to push a page that contains a local path.
@@ -75,23 +78,27 @@ To link a published report from the PR:
 ```
 bin/cpr comment 5201             # print the comment that would be posted
 bin/cpr comment 5201 --post      # post it as your gh account, or edit our earlier comment
+bin/cpr comment sidecar#397      # the same for a subproject PR, posted to its own repository
 ```
 
-`--post` asks for confirmation unless `--yes` is given.
+`--post` asks for confirmation unless `--yes` is given. The link points at the Pages site of this
+checkout's `origin` (set `CPR_PAGES_BASE` to the site root to override).
 
 ### Automatic refresh
 
 `.github/workflows/poll.yml` runs every six hours (and on manual dispatch, with a `limit` input). It
-lists open apache/cassandra PRs, picks those with no published report or a new head (newest first;
-drafts untouched for 30 days are skipped; 25 per run), runs the cheap pipeline for each (requirement
+lists the open PRs of apache/cassandra, apache/cassandra-sidecar and apache/cassandra-analytics, picks
+those with no published report or a new head (newest first; drafts untouched for 30 days are skipped;
+25 per project per run), runs the cheap pipeline for each (requirement
 checks, triage, static analysis, context, lab plan), and pushes the result to `gh-pages` with the
 default `GITHUB_TOKEN`. It runs no AI code review and no builds and posts no comments, so those
 sections read "not run" for a PR until you run `/review-pr` and `cpr build` and publish. A published
 report with code review or build results for the current head is never replaced by a plainer one; a
 new head replaces it. The index shows when each report was generated and whether code review ran.
 
-Locally, `cpr poll` prints what a run would pick (reading `origin/gh-pages`); `cpr poll --run --site DIR`
-refreshes a checkout of `gh-pages` the same way the workflow does.
+Locally, `cpr poll` prints what a run would pick for each project (reading `origin/gh-pages`;
+`--project sidecar` for one); `cpr poll --run --site DIR` refreshes a checkout of `gh-pages` the same way
+the workflow does.
 
 ## What the report checks
 

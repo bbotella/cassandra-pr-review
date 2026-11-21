@@ -86,7 +86,7 @@ class Body(unittest.TestCase):
         self.assertIn(m["recommendation"]["label"], body)
         self.assertIn("triage " + m["triage"]["rating"], body)
         self.assertIn("no code review run", body)
-        self.assertIn("https://pmcfadin.github.io/cassandra-pr-review/pr/5201/", body)
+        self.assertIn("https://pmcfadin.github.io/cassandra-pr-review/cassandra/pr/5201/", body)
         self.assertIn("Advisory", body)
 
     def test_must_fix_count(self):
@@ -116,20 +116,20 @@ class PagesBase(unittest.TestCase):
                        "https://github.com/pmcfadin/cassandra-pr-review.git",
                        "https://github.com/pmcfadin/cassandra-pr-review",
                        "ssh://git@github.com/pmcfadin/cassandra-pr-review.git"):
-            self.assertEqual(self.base_for(origin), "https://pmcfadin.github.io/cassandra-pr-review/pr", origin)
+            self.assertEqual(self.base_for(origin), "https://pmcfadin.github.io/cassandra-pr-review", origin)
 
     def test_fork_links_to_its_own_site(self):
         self.assertEqual(self.base_for("git@github.com:BBotella/cassandra-pr-review.git"),
-                         "https://bbotella.github.io/cassandra-pr-review/pr")
+                         "https://bbotella.github.io/cassandra-pr-review")
         with mock.patch.object(comment, "origin_url", lambda: "git@github.com:bbotella/cassandra-pr-review.git"):
-            self.assertIn("https://bbotella.github.io/cassandra-pr-review/pr/5201/", comment.build_body(make_model()))
+            self.assertIn("https://bbotella.github.io/cassandra-pr-review/cassandra/pr/5201/", comment.build_body(make_model()))
 
     def test_user_site_repo_is_the_root(self):
-        self.assertEqual(self.base_for("git@github.com:someone/someone.github.io.git"), "https://someone.github.io/pr")
+        self.assertEqual(self.base_for("git@github.com:someone/someone.github.io.git"), "https://someone.github.io")
 
     def test_env_overrides(self):
-        with mock.patch.dict(os.environ, {"CPR_PAGES_BASE": "https://reviews.example.org/pr/"}):
-            self.assertEqual(self.base_for(None), "https://reviews.example.org/pr")
+        with mock.patch.dict(os.environ, {"CPR_PAGES_BASE": "https://reviews.example.org/"}):
+            self.assertEqual(self.base_for(None), "https://reviews.example.org")
 
     def test_unknown_origin_refuses(self):
         for origin in (None, "git@gitlab.com:someone/cassandra-pr-review.git"):
@@ -185,6 +185,21 @@ class Plan(Base):
     def test_no_reasons(self):
         self.model["recommendation"]["reasons"] = []
         self.assertTrue(any("no reasons" in x for x in self.plan()["problems"]))
+
+    def test_sidecar_links_and_posts_to_its_own_repo(self):
+        from tests.helpers import sidecar_bundle
+        b = sidecar_bundle()
+        b["pr"]["head_sha"] = SHA
+        m = model.build(b, checks.run_all(b), triage(b), render.load_docs(), diffview.unavailable("x"))
+        self.page = page_for(m)
+        urls = []
+        with mock.patch.object(comment, "fetch_page", lambda url: urls.append(url) or self.page):
+            p = comment.plan(397, m)
+        self.assertEqual((p["repo"], p["slug"]), ("apache/cassandra-sidecar", "sidecar"))
+        self.assertIn("https://pmcfadin.github.io/cassandra-pr-review/sidecar/pr/397/", p["body"])
+        self.assertEqual(urls, ["https://pmcfadin.github.io/cassandra-pr-review/sidecar/pr/397/"])
+        self.assertIn(["pr", "view", "397", "-R", "apache/cassandra-sidecar", "--json", "headRefOid"], self.gh.calls)
+        self.assertTrue(any(c[:2] == ["api", "repos/apache/cassandra-sidecar/issues/397/comments"] for c in self.gh.calls))
 
 
 class Post(Base):
