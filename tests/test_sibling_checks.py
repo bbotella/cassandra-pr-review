@@ -124,20 +124,37 @@ class ReviewFindings(unittest.TestCase):
         b = with_files(sidecar_bundle(), [("server/src/main/java/org/apache/cassandra/sidecar/X.java", ["int x;"], False)])
         self.assertIn("src/integrationTest", results(b)["tests.present"]["action"])
 
-    def test_build_refuses_a_project_without_an_ant_build(self):
+    def test_build_runs_the_gradle_strategy_for_a_committer(self):
         import contextlib
         import io
         from cpr import cli
         from cpr.ingest import bundle as bundle_mod
         with tempfile.TemporaryDirectory() as d:
             b = sidecar_bundle()
-            b["pr"]["author"], b["pr"]["author_association"] = "bob", "MEMBER"  # a committer: would build
+            b["pr"]["author"], b["pr"]["author_association"] = "bob", "MEMBER"  # a committer: builds
             bundle_mod.save(b, d)
             out = io.StringIO()
-            with mock.patch("cpr.build.runner.build", side_effect=AssertionError("built")), contextlib.redirect_stdout(out):
+            with mock.patch("cpr.build.runner.build", return_value=("/x/status.json", {"status": "pass", "reason": "ok"})) as run, \
+                    contextlib.redirect_stdout(out):
+                self.assertEqual(cli.main(["build", "sidecar#397", "--work-dir", d]), 0)
+            self.assertEqual(run.call_count, 1)
+            self.assertIn("sidecar#397: pass", out.getvalue())
+
+    def test_build_refuses_a_project_with_no_build(self):
+        import contextlib
+        import io
+        from cpr import cli, project
+        from cpr.ingest import bundle as bundle_mod
+        with tempfile.TemporaryDirectory() as d:
+            b = sidecar_bundle()
+            b["pr"]["author"], b["pr"]["author_association"] = "bob", "MEMBER"
+            bundle_mod.save(b, d)
+            out = io.StringIO()
+            with mock.patch.object(project.load("sidecar"), "build", {}), \
+                    mock.patch("cpr.build.runner.build", side_effect=AssertionError("built")), contextlib.redirect_stdout(out):
                 self.assertEqual(cli.main(["build", "sidecar#397", "--work-dir", d]), 0)
             self.assertIn("not-built", out.getvalue())
-            self.assertIn("Ant build only", out.getvalue())
+            self.assertIn("no build set up for Cassandra Sidecar", out.getvalue())
 
 
 class OwnRules(unittest.TestCase):
@@ -165,7 +182,7 @@ class OwnRules(unittest.TestCase):
     def test_about_lists_the_projects_gaps(self):
         b = sidecar_bundle()
         m = model.build(b, checks.run_all(b), triage(b), render.load_docs(project=project.of(b)), diffview.unavailable("x"))
-        self.assertTrue(any("Sidecar PRs" in x for x in m["about"]["not_checked"]))
+        self.assertTrue(any("in-JVM dtest suites are not run" in x for x in m["about"]["not_checked"]))
         self.assertEqual(m["lab_plan"]["status"], "none")
         self.assertIn("no lab plan for Cassandra Sidecar", m["lab_plan"]["reason"])
 

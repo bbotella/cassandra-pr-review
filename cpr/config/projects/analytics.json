@@ -166,14 +166,19 @@
  },
  "not_checked": [
   "Analytics's own Gradle checks (`codeCheckTasks`: checkstyle, RAT, SpotBugs where configured) were not run here; checkstyle ran on the changed files only, and SpotBugs results come in through the CI checks.",
-  "Builds and unit tests are not run for Analytics PRs yet (cpr build supports apache/cassandra's Ant build only).",
+  "Tests are built and run only for committers' PRs (or a PR the owner approved) and only a selection of unit tests; integration, container and in-JVM dtest suites are not run.",
   "CI evidence is the GitHub Actions check-runs of the PR head; failures are counted, not compared against known flaky tests.",
   "Code review lenses read the diff; they do not build or run tests."
  ],
  "ci_branches": [
   "trunk"
  ],
- "build_tool": null,
+ "build": {
+  "tool": "gradle",
+  "jdk": 17,
+  "test_task": "test",
+  "skip_modules": ["cassandra-analytics-integration-tests", "cassandra-analytics-integration-framework", "cassandra-analytics-core-example"]
+ },
  "lenses": {
   "standards": "docs/research/analytics-standards.md",
   "testing_doc": "docs/report/subprojects/testing.md",

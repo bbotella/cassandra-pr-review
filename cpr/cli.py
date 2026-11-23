@@ -291,9 +291,8 @@ def cmd_build(args):
               file=sys.stderr)
         return 1
     decision = gate.decide(bundle, work_dir, approve=args.approve)
-    if proj.data.get("build_tool") != "ant":
-        decision = {**decision, "allowed": False,
-                    "reason": f"cpr build supports apache/cassandra's Ant build only; {proj.name} PRs are not built yet"}
+    if proj.build.get("tool") not in ("ant", "gradle"):
+        decision = {**decision, "allowed": False, "reason": f"cpr build has no build set up for {proj.name} PRs"}
     if not decision["allowed"]:
         path, st = runner.not_built(bundle, work_dir, decision)
     else:

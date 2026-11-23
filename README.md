@@ -22,7 +22,9 @@ analytics 9.3), and the project's compatibility surfaces. Checks that are not pa
 (yaml pairing, nodetool, the upgrade-test CI profile, the lab plan, ...) read not-applicable.
 `/review-pr sidecar#397` runs the same six code review lenses with the Cassandra checklists, the
 project's own contributor guides from its trunk, and its standards file
-(`docs/research/{sidecar,analytics}-standards.md`). Builds are not set up for them yet. The published site,
+(`docs/research/{sidecar,analytics}-standards.md`). `cpr build sidecar#397` runs the project's Gradle build
+(resolved at the merge-base, then offline in the sandbox; Sidecar's in-JVM dtest jar is built from the Cassandra sha
+its own script pins) and the selected unit tests with JaCoCo. The published site,
 polling and `cpr comment` cover all three projects. Each project keeps its own data under
 `.work/pr/<project>/`, `.work/build-runs/<project>/` and `reports/<project>/`; data from before projects
 existed is moved there on the first run.
@@ -41,7 +43,8 @@ bin/cpr tools install            # download and verify the pinned checkstyle and
 ```
 
 Requirements: Python 3.11+ (standard library only), `git`, and `gh` logged in. Builds need `ant`, a
-JDK, and macOS (`sandbox-exec`). The diff view comes from the rustyrazorblade `dev-skills` plugin
+JDK (11 and 17; Sidecar builds on 11, Analytics on 17), and macOS (`sandbox-exec`); Gradle comes from each
+project's own wrapper. The diff view comes from the rustyrazorblade `dev-skills` plugin
 (`/plugin install dev-skills@rustyrazorblade-plugins`); without it, the report shows a plain file
 list instead. Set `CPR_IDE_EXPLAIN` to point at a specific `generate-explain.py`.
 
@@ -111,7 +114,7 @@ the workflow does.
 | Code style | checkstyle-banned APIs (read from the base branch), licence headers, generated or bundled files, `@Deprecated(since=)` |
 | Static analysis | the project's checkstyle, PMD cognitive complexity, the full PMD rule catalog, and CPD duplicate code on changed Java files, split into introduced by the PR and already there |
 | Compatibility | both yaml files updated together, system properties, nodetool help fixtures, touched compatibility surfaces |
-| Build & coverage | the PR head compiles, selected unit tests pass, and which added `src/java` lines those tests ran (JaCoCo) |
+| Build & coverage | the PR head compiles, selected unit tests pass, and which added production lines those tests ran (JaCoCo; Ant for Cassandra, Gradle for the subprojects) |
 | Code review | six AI review lenses (standards and ticket, logic and boundaries, concurrency and lifecycle, persistence and compatibility, completeness, test regime), each applying checklists from apache/cassandra trunk (plus a subproject's own guides and standards) |
 | Reviews & votes | two committer +1s, matched against the public ASF roster |
 | Triage | informational: how hard the PR is to review (easy, moderate, hard) |

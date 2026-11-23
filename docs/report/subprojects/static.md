@@ -50,7 +50,7 @@ Advisory and informational: a warn is a note and does not change the recommendat
 
 Advisory and informational. Owner: contributor.
 
-As for Cassandra: a rule is **house style** when it fires in at least 25% of the base branch's main Java files (the branch baseline is scored once from the files under the main directories above and cached), and **usual for** the project when the PR's production count is not significantly above the branch's rate (one-sided Poisson test, p of at least 0.01). Neither is listed per line or counted. Rules that need compiled classes are greyed and ignored, because these projects are not built here.
+As for Cassandra: a rule is **house style** when it fires in at least 25% of the base branch's main Java files (the branch baseline is scored once from the files under the main directories above and cached), and **usual for** the project when the PR's production count is not significantly above the branch's rate (one-sided Poisson test, p of at least 0.01). Neither is listed per line or counted. As for Cassandra, when a saved build of this head kept its classes and jars, PMD uses them for type resolution; otherwise rules that need compiled classes are greyed and ignored.
 
 - **unknown**: PMD or its rule catalog did not run, or PMD skipped some files and found nothing red in the rest.
 - **warn** (note): at least one Error Prone, Multithreading or Security violation introduced in production code that is not house style, not usual, and not type-dependent.
@@ -108,7 +108,7 @@ Run the projects' checks locally before pushing:
 
 - Real analysis covers changed Java files only; Scala files in Analytics are not analyzed. Over 400 changed files PMD is skipped (`unknown`); each tool has a 120 s cap and a PR a 300 s cap.
 - Sidecar's checkstyle 7.8.1 predates newer Java syntax; the result matches what the project's own Gradle build would report.
-- PMD always runs without type info, because `cpr build` does not build these projects.
+- PMD has type info only when `cpr build` built this head (committer PRs, or an owner-approved build), and only after that build. A plain `cpr review` runs it without.
 - The first PR against `trunk` builds the PMD baseline (its own 900 s cap); later PRs reuse it. If it cannot be built, house style falls back to the touched files, which the block states.
 - Results are computed when the PR is fetched; an offline re-render runs no tool.
 - RAT and SpotBugs are not run.

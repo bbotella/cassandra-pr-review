@@ -31,7 +31,7 @@
  "ci_provider": "jira-ci-summary",
  "disabled_checks": [],
  "labplan": true,
- "build_tool": "ant",
+ "build": {"tool": "ant"},
  "docs_dir": null,
  "commit_subject_key": "forbidden",
  "commands": {

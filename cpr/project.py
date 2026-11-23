@@ -42,6 +42,7 @@ class Project:
         self.lens_testing_doc = lens.get("testing_doc", "docs/report/testing.md")
         self.lens_guides = {p: tuple(names) for p, names in lens.get("guides", {}).items()}
         self.lens_drop = frozenset(lens.get("drop", ()))
+        self.build = data.get("build") or {}
 
     @property
     def key_n(self):

@@ -395,11 +395,11 @@ class RunnerTests(unittest.TestCase):
         with open(sandbox.PROFILE) as f:
             base = f.read().splitlines()
         with open(sandbox.PROFILE_NET) as f:
-            net = [ln for ln in f.read().splitlines() if not ln.startswith(";; NET") and not ln.startswith(";; Used only")]
+            net = f.read().splitlines()[3:]  # the three-line NET header
         self.assertNotIn("(deny network*)", net)
-        self.assertEqual([ln for ln in base if ln != "(deny network*)"],
-                         [ln for ln in net if ln != '  (subpath (param "GRADLE"))'])
+        self.assertEqual([ln for ln in base if ln != "(deny network*)"], net)
         self.assertIn('  (subpath (param "GRADLE"))', net)
+        self.assertIn('  (subpath (param "GRADLE"))', base)
 
     def test_offline_skips_networked_resolve(self):
         sh = FakeShell(self.happy_script())

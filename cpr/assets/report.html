@@ -1144,7 +1144,7 @@ body.no-data #no-data { display: block; }
       var tot = b.changed_total || {};
       out.push(gblock("Changed-line coverage", [
         h("p", null, tot.executable ? (tot.covered + (tot.partial || 0)) + " of " + plural(tot.executable, "added executable line") + " ran under the selected tests."
-          : "No added executable lines under src/java."),
+          : "No added executable lines in the production sources."),
         files.length ? table(["File", "Covered", "Missed lines"], rows, { cls: "build-cov" }) : null], files.length));
     } else {
       out.push(gblock("Changed-line coverage", [empty("Coverage was not measured for this run.", "A build run with coverage turned on would fill this.")]));
